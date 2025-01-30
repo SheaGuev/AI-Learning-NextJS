@@ -6,7 +6,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
-import { createClient1 } from './create-client';
+
 // import { createClient } from '@supabase/supabase-js';
 import { createSClient } from './createServerClient';
 
@@ -119,7 +119,7 @@ export async function actionLoginUser({
   }: z.infer<typeof loginFormSchema>) {
 
     try{
-    const supabase = await createClient1();
+    const supabase = await createSClient();
 
       
         const { data } = await supabase

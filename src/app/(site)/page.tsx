@@ -13,6 +13,8 @@ import clsx from 'clsx';
 import CustomCard from '@/components/landing-page/custom-card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CardContent, CardDescription, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
+
 
 const HomePage = () => {
   return (
@@ -29,10 +31,48 @@ const HomePage = () => {
       md:items-center"
       >
         <TitleSection
-          pill="✨ Your Workspace, Perfected"
-          title="All-In-One Collaboration and Productivity Platform"
+          pill="✨ Your Learning, Streamlined"
+          title="All-In-One AI-Powered Learning Platform"
         />
+
+
         <div
+          className="bg-black
+          p-[25px]
+          mt-6
+          rounded-xl
+          bg-gradient-to-r
+          from-primary
+          to-brand-primaryBlue
+          sm:w-[300px]
+          flex
+          justify-center
+          gap-5
+        "
+        > 
+        
+
+        <Link href={'/login'}>
+          <Button
+            variant="secondary"
+            className="sm:block whitespace-nowrap"
+          >
+            Login
+          </Button>
+        </Link>
+        <Link href="/signup">
+          <Button
+            variant="default"
+            className="whitespace-nowrap"
+          >
+            Sign Up
+          </Button>
+        </Link>
+        
+        </div>
+
+        
+        {/* <div
           className="bg-white
           p-[2px]
           mt-6
@@ -279,11 +319,11 @@ const HomePage = () => {
         px-4
         sm:px-6
       "
-      >
+      > */}
         <TitleSection
           title="The Perfect Plan For You"
           subheading="Experience all the benefits of our platform. Select a plan that suits your needs and take your productivity to new heights."
-          pill="Pricing"
+          pill=""
         />
         <div
           className="flex 

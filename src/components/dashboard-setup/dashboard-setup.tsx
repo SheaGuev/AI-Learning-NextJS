@@ -11,18 +11,21 @@ import {
   CardHeader,
   CardTitle,
 } from '../ui/card';
-// import EmojiPicker from '../global/emoji-picker';
+import EmojiPicker from '../global/emoji-picker';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-// import { Subscription, workspace } from '../../lib/supabase/supabase.types';
+import { Subscription, workspace } from '../../supabase/supabase';
 import { Button } from '../ui/button';
 import Loader from '../global/loader';
-import { createWorkspace } from '../../lib/supabase/queries';
-import { useToast } from '../ui/use-toast';
+import { createWorkspace } from '../../supabase/queries';
+import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAppState } from '../../lib/providers/state-provider';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { CreateWorkspaceFormSchema } from '@/lib/types';
+import { createBClient } from '@/lib/server-actions/createClient';
+import { createSClient } from '@/lib/server-actions/createServerClient';
+
+// import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createWorkspaceFormSchema } from '@/lib/types';
 import { z } from 'zod';
 
 interface DashboardSetupProps {
@@ -38,13 +41,13 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
   const router = useRouter();
   const { dispatch } = useAppState();
   const [selectedEmoji, setSelectedEmoji] = useState('💼');
-  const supabase = createClientComponentClient();
+  const supabase = createBClient();
   const {
     register,
     handleSubmit,
     reset,
     formState: { isSubmitting: isLoading, errors },
-  } = useForm<z.infer<typeof CreateWorkspaceFormSchema>>({
+  } = useForm<z.infer<typeof createWorkspaceFormSchema>>({
     mode: 'onChange',
     defaultValues: {
       logo: '',
@@ -53,7 +56,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
   });
 
   const onSubmit: SubmitHandler<
-    z.infer<typeof CreateWorkspaceFormSchema>
+    z.infer<typeof createWorkspaceFormSchema>
   > = async (value) => {
     const file = value.logo?.[0];
     let filePath = null;
@@ -189,8 +192,9 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
               />
               <small className="text-red-600">
                 {errors?.logo?.message?.toString()}
-              </small>
-              {subscription?.status !== 'active' && (
+               </small>
+              
+              {/* {subscription?.status !== 'active' && (
                 <small
                   className="
                   text-muted-foreground
@@ -198,8 +202,8 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
               "
                 >
                   To customize your workspace, you need to be on a Pro Plan
-                </small>
-              )}
+                </small> 
+              )} */}
             </div>
             <div className="self-end">
               <Button

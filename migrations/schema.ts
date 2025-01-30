@@ -72,8 +72,8 @@ export const users = pgTable("users", {
 			foreignColumns: [table.id],
 			name: "users_id_fkey"
 		}),
-	pgPolicy("Can update own user data.", { as: "permissive", for: "update", to: ["public"], using: sql`(( SELECT auth.uid() AS uid) = id)` }),
-	pgPolicy("Everyone Can view own user data.", { as: "permissive", for: "select", to: ["public"] }),
+	pgPolicy("Everyone Can view own user data.", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
+	pgPolicy("Can update own user data.", { as: "permissive", for: "update", to: ["public"] }),
 ]);
 
 export const customers = pgTable("customers", {
@@ -149,4 +149,17 @@ export const subscriptions = pgTable("subscriptions", {
 			name: "subscriptions_user_id_fkey"
 		}),
 	pgPolicy("Can only view own subs data.", { as: "permissive", for: "select", to: ["public"], using: sql`(( SELECT auth.uid() AS uid) = user_id)` }),
+]);
+
+export const collaborators = pgTable("collaborators", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	workspaceId: uuid("workspace_id").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	userId: uuid("user_id").notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspaces.id],
+			name: "collaborators_workspace_id_workspaces_id_fk"
+		}).onDelete("cascade"),
 ]);

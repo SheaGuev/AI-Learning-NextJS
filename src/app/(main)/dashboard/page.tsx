@@ -1,25 +1,22 @@
 import React from 'react';
-import { createServerClient, createBrowserClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createBClient } from '@/lib/server-actions/createClient';
-// import { createSClient } from '@/lib/server-actions/createServerClient';
+import { createSClient } from '@/lib/server-actions/createServerClient';
 import db from '../../../supabase/db';
 import { redirect } from 'next/navigation';
 import DashboardSetup from '@/components/dashboard-setup/dashboard-setup';
-import { getUserSubscriptionStatus } from '@/lib/supabase/queries';
+import { getUserSubscriptionStatus } from '../../../supabase/queries';
 
 
 
-const DashboardPage: React.FC = async () => {
-  const supabase = createBClient();
+const DashboardPage = async () => {
+  const supabase = await createSClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return <div>loading...</div>;
-  }
+  if (!user) return;
 
   const workspace = await db.query.workspaces.findFirst({
     where: (workspace, { eq }) => eq(workspace.workspaceOwner, user.id),
@@ -29,7 +26,26 @@ const DashboardPage: React.FC = async () => {
     await getUserSubscriptionStatus(user.id);
 
   if (subscriptionError) return;
-  return <div>Dashboard</div>;
+
+  if (!workspace)
+    return (
+      <div
+        className="bg-background
+        h-screen
+        w-screen
+        flex
+        justify-center
+        items-center
+  " 
+      > 
+        <DashboardSetup
+          user={user}
+          subscription={subscription}
+        />
+      </div>
+    );
+
+  redirect(`/dashboard/${workspace.id}`);
 };
 
 export default DashboardPage;
