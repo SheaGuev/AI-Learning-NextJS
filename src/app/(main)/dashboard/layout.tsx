@@ -1,7 +1,8 @@
 // import { SubscriptionModalProvider } from '@/lib/providers/subscription-modal-provider';
 // import { getActiveProductsWithPrice } from '@/supabase/queries';
-import AppStateProvider from '../../../lib/providers/state-provider';
+import AppStateProvider from '@/lib/providers/state-provider';
 import React from 'react';
+
 
 interface LayoutProps {
   children: React.ReactNode;

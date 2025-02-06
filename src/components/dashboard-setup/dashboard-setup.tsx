@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAppState } from '../../lib/providers/state-provider';
 import { createBClient } from '@/lib/server-actions/createClient';
-import { createSClient } from '@/lib/server-actions/createServerClient';
+// import { createSClient } from '@/lib/server-actions/createServerClient';
 
 // import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { createWorkspaceFormSchema } from '@/lib/types';
@@ -32,7 +32,7 @@ interface DashboardSetupProps {
   user: AuthUser;
   subscription: {} | null;
 }
-
+console.log('No workspace found for user');
 const DashboardSetup: React.FC<DashboardSetupProps> = ({
   subscription,
   user,
