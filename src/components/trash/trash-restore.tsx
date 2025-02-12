@@ -17,7 +17,7 @@ const TrashRestore = () => {
         ?.folders.filter((folder) => folder.inTrash) || [];
     setFolders(stateFolders);
 
-    let stateFiles: File[] = [];
+    const stateFiles: File[] = [];
     state.workspaces
       .find((workspace) => workspace.id === workspaceId)
       ?.folders.forEach((folder) => {

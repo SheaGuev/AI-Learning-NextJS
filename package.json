@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lintfix": "next lint --fix",
     "push": "drizzle-kit push",
     "pull": "drizzle-kit introspect",
     "generate": "drizzle-kit generate",

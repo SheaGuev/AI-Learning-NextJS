@@ -1,4 +1,5 @@
 import React from 'react';
+import { Suspense } from 'react';
 
 interface TemplateProps {
   children: React.ReactNode;
@@ -6,6 +7,7 @@ interface TemplateProps {
 
 const Template: React.FC<TemplateProps> = ({ children }) => {
   return (
+    <Suspense>
     <div
       className="
       h-screen
@@ -13,7 +15,7 @@ const Template: React.FC<TemplateProps> = ({ children }) => {
       justify-center"
     >
       {children}
-    </div>
+    </div></Suspense>
   );
 };
 
