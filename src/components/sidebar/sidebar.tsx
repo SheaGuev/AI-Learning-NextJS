@@ -50,7 +50,7 @@ await Promise.all([
 
 
     return (
-    <aside className={twMerge("scrollbar-thin overflow-hidden !justify-between sm:fkex sm:flex-col w-[280px] shrink-0p-4 md:gap-4" , className)}>
+    <aside className={twMerge("scrollbar-hide overflow-hidden !justify-between sm:fkex sm:flex-col w-[280px] shrink-0p-4 md:gap-4" , className)}>
 
     <div>
         <WorkspaceDropdown
@@ -67,7 +67,7 @@ await Promise.all([
         <NativeNavigation myWorkspaceId={workspaceid} />
                 <ScrollArea
                   className="overflow-scroll relative
-                  h-[450px]
+                  h-[450px] scrollbar-hide
                 "
                 >
                   <div

@@ -19,7 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children, params }) => {
       <MobileSidebar>
         <Sidebar
           params={params}
-          className="w-screen inline-block sm:hidden"
+          className="w-screen inline-block sm:hidden scrollbar-hide" 
         />
       </MobileSidebar>
       <div
@@ -28,6 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, params }) => {
         w-full
         relative
         overflow-scroll
+        scrollbar-hide
       "
       >
         {children}

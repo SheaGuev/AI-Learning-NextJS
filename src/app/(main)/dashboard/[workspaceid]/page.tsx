@@ -12,7 +12,7 @@ const Workspace = async ({ params }: { params: Params }) => {
   const { data, error } = await getWorkspaceDetails(workspaceid);
     // if (error || !data.length) redirect('/dashboard');
   return (
-    <div className="relative">
+    <div className="relative scrollbar-hide">
       
       {/* <QuillEditor
         dirType="workspace"

@@ -7,9 +7,9 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-module.exports = {
-  ...nextConfig,
-  experimental: {
-    missingSuspenseWithCSRBailout: false,
-  },
-};
+// module.exports = {
+//   ...nextConfig,
+//   experimental: {
+//     missingSuspenseWithCSRBailout: false,
+//   },
+// };

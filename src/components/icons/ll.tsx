@@ -6,8 +6,8 @@ export default function ll() {
   return (
     <Image
       src={Logo}
-      width={500}
-      height={500}
+      width={50}
+      height={50}
       alt="Picture of the author"
     />
   )
