@@ -21,7 +21,7 @@ const Sidebar: React.FC<sidebarProps> = async ({params, className}) => {
 
 if (!user) return;
 
-console.log(params);
+// console.log(params);
 
 //subscriptions
 const { data: subStatus, error: subError } = await getUserSubscriptionStatus(user.id);
@@ -34,7 +34,7 @@ const { data: folders, error: folderError } = await getFolders(workspaceid);
 
 
 const { data: workspaceFolderData, error: foldersError } = await getFolders(
-  params.workspaceid
+  workspaceid
 );
   
 if (subError || folderError) console.log(subError ||  folderError);
@@ -64,7 +64,7 @@ await Promise.all([
           ].find((workspace) => workspace.id === workspaceid)}
         />
 
-        <NativeNavigation myWorkspaceId={params.workspaceid} />
+        <NativeNavigation myWorkspaceId={workspaceid} />
                 <ScrollArea
                   className="overflow-scroll relative
                   h-[450px]
@@ -83,7 +83,7 @@ await Promise.all([
                   />
                   <FoldersDropdownList
                     workspaceFolders={workspaceFolderData || []}
-                    workspaceId={params.workspaceid}
+                    workspaceId={workspaceid}
                   />
                 </ScrollArea>
 

@@ -1,64 +1,50 @@
+
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
-import { createSClient } from './createServerClient';
-// import { createBClient } from './lib/server-actions/createClient';
+
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
-  const res = NextResponse.next();
+  // Initialize a single response object
+  const response = NextResponse.next({ request });
 
-  
-  
-
- const supabase = createServerClient(
+  // Create Supabase client with cookie handling
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet) => {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
         },
       },
     }
-  )
-// export const runtime = 'experimental-edge'; 
+  );
 
-// export async function middleware(req: NextRequest) {
-//   const res = NextResponse.next();
-
-//   export const config = {
-//   matcher: [
-//     '/((?!api|_next/static|_next/image|favicon.ico|public|site.webmanifest|robots.txt|sitemap.xml|auth|.*\\.(?:ico|json|txt|xml|png|jpg|jpeg|gif|svg|css|js|woff2)).*)'
-//   ]
-// };
-  
-  // Create Supabase client with proper cookie handling
-  // const supabase = await createSClient();
-
-  // Refresh session (critical for middleware)
-  // const { data: { session } } = await supabase.auth.getSession();
-
+  // Get the current user session
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
 
 
-  // Dashboard protection
+  // Obtain the current user session (or user info)
+  const { pathname, searchParams } = request.nextUrl;
+  
+  // If on /email and no confirmation code exists, assume confirmation is done.
+  if (pathname === '/email' && !searchParams.get('code')) {
+    // If the user is authenticated, redirect away from the /email route.
+    if (user) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
+  // Protect dashboard routes: redirect to login if not authenticated
   if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Handle email link errors
+  // Handle email link errors: if the error description matches and not on signup, then redirect to signup
   const emailLinkError = 'Email link is invalid or has expired';
   if (
     request.nextUrl.searchParams.get('error_description') === emailLinkError &&
@@ -69,51 +55,11 @@ export async function updateSession(request: NextRequest) {
     );
   }
 
-  // Redirect authenticated users from auth pages
-  if (['/login', '/signup'].includes(request.nextUrl.pathname) && user) {
+  // Redirect authenticated users from auth pages to dashboard
+  if (['/login', '/signup', '/email'].includes(request.nextUrl.pathname) && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  return res;
-  // return supabaseResponse;
+  // Return the unified response object with any cookies updated
+  return response;
 }
-
-
-
-// import { createServerClient } from '@supabase/ssr';
-// import { NextRequest, NextResponse } from 'next/server';
-
-// export async function middleware(req: NextRequest) {
-//   const res = NextResponse.next();
-//   const supabase = createServerClient({ req, res });
-//   const {
-//     data: { session },
-//   } = await supabase.auth.getSession();
-//   if (req.nextUrl.pathname.startsWith('/dashboard')) {
-//     if (!session) {
-//       return NextResponse.redirect(new URL('/login', req.url));
-//     }
-//   }
-
-//   const emailLinkError = 'Email link is invalid or has expired';
-//   if (
-//     req.nextUrl.searchParams.get('error_description') === emailLinkError &&
-//     req.nextUrl.pathname !== '/signup'
-//   ) {
-//     return NextResponse.redirect(
-//       new URL(
-//         `/signup?error_description=${req.nextUrl.searchParams.get(
-//           'error_description'
-//         )}`,
-//         req.url
-//       )
-//     );
-//   }
-
-//   if (['/login', '/signup'].includes(req.nextUrl.pathname)) {
-//     if (session) {
-//       return NextResponse.redirect(new URL('/dashboard', req.url));
-//     }
-//   }
-//   return res;
-// }
