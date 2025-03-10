@@ -9,7 +9,8 @@ import { v4 } from 'uuid';
 import { createFolder } from '@/supabase/queries';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion } from '../ui/accordion';
-// import Dropdown from './Dropdown';
+import TooltipWrapper from '../global/tooltip-wrapper';
+import Dropdown from './Dropdown';
 // import useSupabaseRealtime from '@/lib/hooks/useSupabaseRealtime';
 // import { useSubscriptionModal } from '@/lib/providers/subscription-modal-provider';
 
@@ -22,7 +23,7 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
   workspaceFolders,
   workspaceId,
 }) => {
-//   useSupabaseRealtime();
+  // useSupabaseRealtime();
   const { state, dispatch, folderId } = useAppState();
 //   const { open, setOpen } = useSubscriptionModal();
   const { toast } = useToast();
@@ -59,8 +60,8 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
   //add folder
   const addFolderHandler = async () => {
     // if (folders.length >= 3 && !subscription) {
-    //   setOpen(true);
-    //   return;
+      // setOpen(true);
+      // return;
     // }
     const newFolder: Folder = {
       data: null,
@@ -115,35 +116,35 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
         >
           FOLDERS
         </span>
-        {/* <TooltipComponent message="Create Folder">
+        <TooltipWrapper tooltip="Create Folder">
           <PlusIcon
             onClick={addFolderHandler}
-            size={16}
+            size={18}
             className="group-hover/title:inline-block
             hidden 
             cursor-pointer
             hover:dark:text-white
           "
           />
-        </TooltipComponent> */}
+        </TooltipWrapper>
       </div>
       <Accordion
         type="multiple"
         defaultValue={[folderId || '']}
         className="pb-20"
       >
-        {/* {folders
+        {folders
           .filter((folder) => !folder.inTrash)
           .map((folder) => (
-            // <Dropdown
-            //   key={folder.id}
-            //   title={folder.title}
-            //   listType="folder"
-            //   id={folder.id}
-            //   iconId={folder.iconId}
-            // />
+            <Dropdown
+              key={folder.id}
+              title={folder.title}
+              listType="folder"
+              id={folder.id}
+              iconId={folder.iconId}
+            />
           ))
-          } */}
+          }
       </Accordion>
     </>
   );
