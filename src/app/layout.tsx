@@ -3,6 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import db from "../supabase/db";
 import { ThemeProvider } from "@/lib/providers/theme-provider"
+import { SupabaseUserProvider } from "@/lib/providers/supabase-user-provider";
+import { Toaster } from "@/components/ui/toaster";
+import { SocketProvider } from "@/lib/providers/socket-provider";
 
 
 
@@ -44,14 +47,19 @@ export default function RootLayout({
     <>
       <html lang="en" suppressHydrationWarning>
         <head />
-        <body>
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <SupabaseUserProvider>
+              <SocketProvider>
+                {children}
+                <Toaster />
+              </SocketProvider>
+            </SupabaseUserProvider>
           </ThemeProvider>
         </body>
       </html>

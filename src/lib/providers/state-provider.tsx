@@ -228,7 +228,7 @@ const appReducer = (
           if (workspace.id === action.payload.workspaceId) {
             return {
               ...workspace,
-              folder: workspace.folders.map((folder) => {
+              folders: workspace.folders.map((folder) => {
                 if (folder.id === action.payload.folderId) {
                   return {
                     ...folder,

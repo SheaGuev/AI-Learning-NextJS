@@ -50,9 +50,9 @@ await Promise.all([
 
 
     return (
-    <aside className={twMerge("scrollbar-hide overflow-hidden !justify-between sm:fkex sm:flex-col w-[280px] shrink-0p-4 md:gap-4" , className)}>
+    <aside className={twMerge("scrollbar-hide overflow-hidden !justify-between sm:flex sm:flex-col w-[280px] shrink-0 p-4 md:gap-4" , className)}>
 
-    <div>
+    <div className="px-1">
         <WorkspaceDropdown
           privateWorkspaces={privateWorkspaces}
           sharedWorkspaces={sharedWorkspaces}

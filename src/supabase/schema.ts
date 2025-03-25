@@ -173,13 +173,42 @@ import {
   text,
   timestamp,
   uuid,
+  pgEnum,
 } from 'drizzle-orm/pg-core';
-import {
-  prices,
-  products,
-  subscriptionStatus,
-  users,
-} from '../../migrations/schema';
+
+// Define missing enums
+export const subscriptionStatus = pgEnum('subscription_status', [
+  'trialing', 'active', 'canceled', 'incomplete', 
+  'incomplete_expired', 'past_due', 'unpaid'
+]);
+
+// Define tables
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().notNull(),
+  fullName: text('full_name'),
+  avatarUrl: text('avatar_url'),
+  billingAddress: jsonb('billing_address'),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }),
+  paymentMethod: jsonb('payment_method'),
+  email: text('email'),
+});
+
+export const products = pgTable('products', {
+  id: text('id').primaryKey().notNull(),
+  active: boolean('active'),
+  name: text('name'),
+  description: text('description'),
+  image: text('image'),
+  metadata: jsonb('metadata'),
+});
+
+export const prices = pgTable('prices', {
+  id: text('id').primaryKey().notNull(),
+  productId: text('product_id').references(() => products.id),
+  active: boolean('active'),
+  description: text('description'),
+  // Add other fields as needed
+});
 
 export const workspaces = pgTable('workspaces', {
   id: uuid('id').defaultRandom().primaryKey().notNull(),
