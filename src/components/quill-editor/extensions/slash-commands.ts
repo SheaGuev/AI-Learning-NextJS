@@ -327,11 +327,8 @@ export default class SlashCommands {
       }
     });
     
-    // Visual debugging - add a bright border
-    this.container.style.border = '4px solid #ff0000';
-    
     // Add an animation for visibility
-    this.container.style.animation = 'none';
+    // this.container.style.animation = 'none';
     void this.container.offsetWidth; // Trigger reflow
     this.container.style.animation = 'fadeIn 0.2s ease-in-out';
     
@@ -343,12 +340,12 @@ export default class SlashCommands {
     
     // Add a fixed label to the top of the menu for debugging
     const debugLabel = document.createElement('div');
-    debugLabel.textContent = 'SLASH COMMANDS MENU';
-    debugLabel.style.padding = '8px';
-    debugLabel.style.background = '#ff0000';
-    debugLabel.style.color = 'white';
-    debugLabel.style.fontWeight = 'bold';
-    debugLabel.style.textAlign = 'center';
+    // debugLabel.textContent = 'SLASH COMMANDS MENU';
+    // debugLabel.style.padding = '8px';
+    // debugLabel.style.background = '#29094b';
+    // debugLabel.style.color = 'white';
+    // debugLabel.style.fontWeight = 'bold';
+    // debugLabel.style.textAlign = 'center';
     this.container.insertBefore(debugLabel, this.container.firstChild);
   }
   
@@ -363,11 +360,18 @@ export default class SlashCommands {
     
     // Add menu items based on your options
     const commandOptions = this.options.commands || [];
-    console.log('Populating menu with commands', { commandCount: commandOptions.length });
+    console.log('Populating menu with commands', { 
+      commandCount: commandOptions.length,
+      commands: commandOptions.map((cmd: CommandOption) => ({
+        label: cmd.label,
+        hasHandler: !!cmd.handler
+      }))
+    });
     
-    commandOptions.forEach((command: any) => {
+    commandOptions.forEach((command: any, index: number) => {
       const item = document.createElement('div');
       item.className = 'ql-slash-command-item';
+      item.dataset.command = command.label.toLowerCase().replace(/\s+/g, '-');
       
       // Add icon if available
       if (command.icon) {
@@ -397,9 +401,25 @@ export default class SlashCommands {
       
       item.appendChild(textContainer);
       
-      // Add handler for click
-      item.addEventListener('click', () => {
-        this.executeCommand(command);
+      // Add handler for click with error handling
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log('Menu item clicked:', {
+          label: command.label,
+          index,
+          hasHandler: !!command.handler
+        });
+
+        // Ensure editor is focused
+        this.quill.focus();
+
+        try {
+          this.executeCommand(command);
+        } catch (error) {
+          console.error('Error handling menu item click:', error);
+        }
       });
       
       // Append to container
@@ -434,24 +454,91 @@ export default class SlashCommands {
   }
   
   executeCommand(command: any) {
-    // Delete the slash command text
+    console.log('Executing command:', {
+      commandLabel: command.label,
+      commandType: command.type,
+      commandHandler: !!command.handler
+    });
+
+    // Store the current selection before any DOM changes
     const selection = this.quill.getSelection();
-    if (!selection) return;
-    
+    if (!selection) {
+      console.error('No selection found when executing command');
+      return;
+    }
+
+    console.log('Current selection:', selection);
+
+    // Get the line and offset before any changes
     const [line, offset] = this.quill.getLine(selection.index);
+    if (!line || !line.domNode) {
+      console.error('Could not get line information');
+      return;
+    }
+
     const text = line.domNode.textContent;
     const slashIndex = text.lastIndexOf('/');
-    
+
     if (slashIndex !== -1) {
       const charsToDelete = offset - slashIndex;
-      this.quill.deleteText(selection.index - charsToDelete, charsToDelete);
+      console.log('Deleting slash command text:', {
+        startIndex: selection.index - charsToDelete,
+        charsToDelete,
+        textToDelete: text.slice(slashIndex, offset)
+      });
+
+      // Delete the slash command text
+      this.quill.deleteText(selection.index - charsToDelete, charsToDelete, 'user');
+
+      // Update selection after deletion
+      const newIndex = selection.index - charsToDelete;
+      this.quill.setSelection(newIndex, 0, 'user');
+
+      // Run the command with error handling
+      try {
+        console.log('Executing command handler with range:', {
+          index: newIndex,
+          length: 0
+        });
+
+        // Ensure we're still focused on the editor
+        this.quill.focus();
+
+        // Execute the command handler
+        command.handler(this.quill, { index: newIndex, length: 0 });
+
+        console.log('Command handler executed successfully');
+
+        // Force a format update based on command type
+        if (command.label.toLowerCase().includes('heading')) {
+          const level = parseInt(command.label.split(' ')[1]);
+          this.quill.formatLine(newIndex, 1, 'header', level, 'user');
+        } else if (command.label.toLowerCase().includes('list')) {
+          const type = command.label.toLowerCase().includes('bullet') ? 'bullet' : 'ordered';
+          this.quill.formatLine(newIndex, 1, 'list', type, 'user');
+        } else if (command.label.toLowerCase().includes('quote')) {
+          this.quill.formatLine(newIndex, 1, 'blockquote', true, 'user');
+        } else if (command.label.toLowerCase().includes('code')) {
+          this.quill.formatLine(newIndex, 1, 'code-block', true, 'user');
+        }
+
+        // Ensure the editor maintains focus
+        setTimeout(() => {
+          this.quill.focus();
+          this.quill.setSelection(newIndex, 0, 'user');
+        }, 0);
+
+      } catch (error) {
+        console.error('Error executing command handler:', error);
+        // Attempt to recover by inserting a newline
+        this.quill.insertText(newIndex, '\n', 'user');
+      }
     }
-    
-    // Run the command
-    command.handler(this.quill, selection);
-    
-    // Close the menu
-    this.closeMenu();
+
+    // Close the menu after a short delay to ensure the command is executed
+    setTimeout(() => {
+      this.closeMenu();
+    }, 100);
   }
   
   handleArrowUp() {
@@ -517,7 +604,10 @@ export default class SlashCommands {
     const selectedItem = this.container.querySelector('.ql-slash-command-item.selected') as HTMLElement;
     
     if (selectedItem) {
-      console.log('Selected item found, triggering click event');
+      console.log('Selected item found:', {
+        label: selectedItem.querySelector('.ql-slash-command-label')?.textContent,
+        command: selectedItem.dataset.command
+      });
       // Simulate a click on the selected item
       selectedItem.click();
       return false; // Prevent default
@@ -526,12 +616,16 @@ export default class SlashCommands {
     // If no item is selected but menu is open, select the first visible item
     const firstItem = this.container.querySelector('.ql-slash-command-item:not([style*="display: none"])') as HTMLElement;
     if (firstItem) {
-      console.log('No selected item, selecting and clicking first item');
+      console.log('No selected item, selecting and clicking first item:', {
+        label: firstItem.querySelector('.ql-slash-command-label')?.textContent,
+        command: firstItem.dataset.command
+      });
       firstItem.click();
       return false; // Prevent default
     }
     
     // If no items at all, close the menu
+    console.log('No items found in menu, closing');
     this.closeMenu();
     return true; // Allow default behavior (new line)
   }
@@ -552,4 +646,11 @@ export default class SlashCommands {
       this.isOpen = false;
     }
   }
+}
+
+interface CommandOption {
+  label: string;
+  icon?: string;
+  description?: string;
+  handler: (quill: any, range: any) => void;
 } 

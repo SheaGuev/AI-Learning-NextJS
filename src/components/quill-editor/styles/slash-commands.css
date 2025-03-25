@@ -13,18 +13,21 @@
 .ql-slash-commands {
   position: fixed;
   z-index: 2000;
-  background: white;
+  background: #1a1a1a;
   border-radius: 6px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   max-height: 300px;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   width: 350px;
-  border: 2px solid #4b89ff;
+  border: 2px solid #0f031c;
   opacity: 1 !important;
   transform: translateZ(0);
   animation: fadeIn 0.15s ease-out;
   margin: 0;
   padding: 0;
+  color: #ffffff;
 }
 
 .ql-slash-commands.hidden {
@@ -41,7 +44,7 @@
 
 .ql-slash-command-item:hover,
 .ql-slash-command-item.selected {
-  background-color: #f0f4ff;
+  background-color: #2d2d2d;
 }
 
 .ql-slash-command-icon {
@@ -51,19 +54,21 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  background-color: #f5f5f5;
+  background-color: #333333;
   border-radius: 4px;
   padding: 4px;
+  color: #ffffff;
 }
 
 .ql-slash-command-label {
   font-size: 16px;
   font-weight: 500;
+  color: #ffffff;
 }
 
 .ql-slash-command-description {
   font-size: 13px;
-  color: #666;
+  color: #999999;
   margin-top: 4px;
 }
 
@@ -72,8 +77,9 @@
   margin: 1em 0;
   padding: 16px;
   border-radius: 4px;
-  background-color: #f8f9fa;
+  background-color: #2d2d2d;
   border-left: 4px solid #4b89ff;
+  color: #ffffff;
 }
 
 .ql-callout-icon {
@@ -88,10 +94,10 @@
 
 .ql-hr {
   border: none;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid #404040;
   margin: 1.5em 0;
 }
 
 .ql-editor:focus-within + .ql-slash-commands:not(.hidden) {
-  outline: 3px solid red !important;
+  outline: 3px solid #4b89ff !important;
 } 

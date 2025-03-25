@@ -680,7 +680,7 @@ const Dropdown: React.FC<DropdownProps> = ({
         p-2 
         dark:text-muted-foreground 
         text-sm"
-        disabled={false} // Changed from listType === 'file' to false to ensure events work
+        disabled={false}
         onFocus={() => listType === 'folder' && setIsAccordionOpen(true)}
         onClick={async (e) => {
           console.log(`AccordionTrigger clicked for ${listType}`, { id });
@@ -700,101 +700,60 @@ const Dropdown: React.FC<DropdownProps> = ({
         showArrow={listType === 'folder'}
       >
         <div className={groupIdentifies}>
-          <div
-            className="flex 
-          gap-4 
-          items-center 
-          justify-center 
-          overflow-hidden"
-          >
-            <div className="relative">
-              <EmojiPicker getValue={onChangeEmoji}>{iconId}</EmojiPicker>
-            </div>
-            <input
-              title={listType === 'folder' ? 'Folder Title' : 'File Title'}
-              placeholder={listType === 'folder' ? 'Enter folder title' : 'Enter file title'}
-              type="text"
-              value={listType === 'folder' ? folderTitle : fileTitle}
-              className={clsx(
-                'outline-none overflow-hidden w-[140px] text-Neutrals/neutrals-7',
-                {
-                  'bg-muted cursor-text': isEditing,
-                  'bg-transparent cursor-pointer': !isEditing,
-                }
-              )}
-              readOnly={!isEditing}
-              onDoubleClick={(e) => {
-                console.log(`Input double clicked for ${listType}`, { id });
-                handleDoubleClick(e as unknown as React.MouseEvent);
-              }}
-              onBlur={handleBlur}
-              onChange={
-                listType === 'folder' ? folderTitleChange : fileTitleChange
-              }
-            />
+          <div className="flex gap-2 items-center">
+            {!isEditing ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <EmojiPicker getValue={onChangeEmoji}>
+                    <div className="w-[24px] h-[24px] flex items-center justify-center">
+                      {iconId}
+                    </div>
+                  </EmojiPicker>
+                  <span className="text-sm">{folderTitle || fileTitle}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <EmojiPicker getValue={onChangeEmoji}>
+                  <div className="w-[24px] h-[24px] flex items-center justify-center">
+                    {iconId}
+                  </div>
+                </EmojiPicker>
+                <input
+                  type="text"
+                  value={folderTitle || fileTitle}
+                  onChange={(e) => {
+                    if (listType === 'folder') {
+                      folderTitleChange(e);
+                    } else {
+                      fileTitleChange(e);
+                    }
+                  }}
+                  onBlur={handleBlur}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleBlur();
+                    }
+                  }}
+                  autoFocus
+                  className="bg-transparent text-sm border-none focus:outline-none"
+                  aria-label={`Edit ${listType} title`}
+                />
+              </div>
+            )}
           </div>
           <div className={hoverStyles}>
-            <TooltipWrapper tooltip={listType === 'folder' ? "Delete Folder" : "Delete File"}>
-              <div 
-                className="cursor-pointer z-50 p-2" 
+            <TooltipWrapper tooltip="Delete">
+              <div
+                className="p-1 hover:bg-slate-600 rounded-full transition-colors"
                 onClick={(e) => {
-                  console.log("🔍 Delete icon clicked for", { 
-                    listType, 
-                    id, 
-                    isFile: listType === 'file' 
-                  });
-                  e.preventDefault();
                   e.stopPropagation();
-                  
-                  // Handle based on listType
                   if (listType === 'file') {
-                    // File deletion logic
-                    const pathId = id.split('folder');
-                    console.log("🔍 File ID after splitting:", pathId);
-                    
-                    if (pathId.length === 2 && pathId[1] && workspaceId) {
-                      const deletedByMessage = user?.email ? `Deleted by ${user.email}` : 'Deleted';
-                      
-                      console.log('🔍 Attempting to delete file:', { 
-                        folderId: pathId[0], 
-                        fileId: pathId[1],
-                        workspaceId
-                      });
-                      
+                    const pathId = id.split('folder')[1];
+                    if (pathId) {
                       try {
-                        // Update UI first for instant feedback
-                        dispatch({
-                          type: 'UPDATE_FILE',
-                          payload: {
-                            file: { inTrash: deletedByMessage },
-                            folderId: pathId[0],
-                            workspaceId,
-                            fileId: pathId[1],
-                          },
-                        });
-                        
-                        console.log("🔍 Dispatch for file update completed");
-                        
-                        // Then update database
-                        updateFile(
-                          { inTrash: deletedByMessage },
-                          pathId[1]
-                        ).then(({ data, error }) => {
-                          if (error) {
-                            console.error('🔍 Error moving file to trash:', error);
-                            toast({
-                              title: 'Error',
-                              variant: 'destructive',
-                              description: 'Could not move the file to trash',
-                            });
-                          } else {
-                            console.log('🔍 File successfully moved to trash:', data);
-                            toast({
-                              title: 'Success',
-                              description: 'Moved file to trash',
-                            });
-                          }
-                        });
+                        console.log('🔍 Moving file to trash:', { pathId });
+                        moveToTrash(e);
                       } catch (err) {
                         console.error('🔍 Exception in file trash operation:', err);
                         toast({
@@ -826,14 +785,25 @@ const Dropdown: React.FC<DropdownProps> = ({
             </TooltipWrapper>
             {listType === 'folder' && !isEditing && (
               <TooltipWrapper tooltip="Add File">
-                <PlusIcon
+                <div
                   onClick={(e) => {
                     e.stopPropagation();
                     addNewFile();
                   }}
-                  size={15}
-                  className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
-                />
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      addNewFile();
+                    }
+                  }}
+                >
+                  <PlusIcon
+                    size={15}
+                    className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
+                  />
+                </div>
               </TooltipWrapper>
             )}
           </div>

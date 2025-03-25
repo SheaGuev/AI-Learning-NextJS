@@ -35,21 +35,25 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
         wrapper.append(editor);
         
         try {
+          // Import Quill and its modules
           const Quill = (await import('quill')).default;
           const QuillCursors = (await import('quill-cursors')).default;
           
-          // Register modules
+          // Register modules before creating the editor instance
           console.log('Registering Quill modules...');
+          
+          // Register cursors module
           Quill.register('modules/cursors', QuillCursors);
+          
+          // Register slash commands module
           Quill.register('modules/slashCommands', SlashCommands);
-          console.log('SlashCommands module registered');
           
-          // Create the editor instance
-          console.log('Creating Quill instance with slash commands config', {
-            slashCommandsEnabled: true,
-            commandsCount: ICONS ? Object.keys(ICONS).length : 0
-          });
+          // Register custom blocks
+          registerCustomBlocks(Quill);
           
+          console.log('All modules registered successfully');
+          
+          // Create the editor instance with all necessary modules
           const q = new Quill(editor, {
             theme: 'snow',
             modules: {
@@ -159,16 +163,16 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
               }
             },
             placeholder: 'Start writing or type "/" for commands...',
+            formats: ['header', 'list', 'blockquote', 'code-block', 'hr', 'callout'],
           });
           
-          // Register custom blocks (hr, callout, etc.)
-          registerCustomBlocks(Quill);
-          
-          // Verify slash commands module is available
+          // Verify modules are loaded
+          const cursorsModule = q.getModule('cursors');
           const slashCommandsModule = q.getModule('slashCommands');
-          console.log('Slash commands module loaded:', { 
-            moduleExists: !!slashCommandsModule,
-            moduleDetails: slashCommandsModule ? Object.keys(slashCommandsModule) : 'N/A'
+          
+          console.log('Module verification:', {
+            cursors: !!cursorsModule,
+            slashCommands: !!slashCommandsModule
           });
           
           // Initialize the editor
