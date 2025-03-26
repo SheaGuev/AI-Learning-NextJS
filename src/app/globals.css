@@ -7,6 +7,31 @@ html, body{
   background-color: black;
 }
 
+/* Custom Quill Editor Styles - Remove white borders */
+.ql-container.ql-snow,
+.ql-toolbar.ql-snow {
+  border: none !important;
+}
+
+.ql-editor {
+  padding: 1rem;
+}
+
+.ql-toolbar.ql-snow {
+  background-color: transparent;
+  padding: 0.5rem 1rem;
+}
+
+/* Remove editor background to match app theme */
+.ql-container.ql-snow {
+  background-color: transparent;
+}
+
+.ql-editor {
+  color: var(--foreground);
+  background-color: transparent;
+}
+
 /* @layer base {
   :root {
     --background: 0 0% 100%;

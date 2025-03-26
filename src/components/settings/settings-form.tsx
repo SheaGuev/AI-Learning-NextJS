@@ -70,7 +70,7 @@ const SettingsForm = () => {
   const [collaborators, setCollaborators] = useState<User[] | []>([]);
   const [openAlertMessage, setOpenAlertMessage] = useState(false);
   const [workspaceDetails, setWorkspaceDetails] = useState<workspace>();
-//   const titleTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); //referemce pr mi;; cjamge 
   const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
@@ -115,17 +115,17 @@ const SettingsForm = () => {
   };
 
   //on change
-//   const workspaceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     if (!workspaceId || !e.target.value) return;
-//     dispatch({
-//       type: 'UPDATE_WORKSPACE',
-//       payload: { workspace: { title: e.target.value }, workspaceId },
-//     });
-//     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
-//     titleTimerRef.current = setTimeout(async () => {
-//       // await updateWorkspace({ title: e.target.value }, workspaceId);
-//     }, 500);
-//   };
+  const workspaceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!workspaceId || !e.target.value) return;
+    dispatch({
+      type: 'UPDATE_WORKSPACE',
+      payload: { workspace: { title: e.target.value }, workspaceId },
+    });
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    titleTimerRef.current = setTimeout(async () => {
+      await updateWorkspace({ title: e.target.value }, workspaceId);
+    }, 500);
+  };
 
   const onChangeWorkspaceLogo = async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -207,7 +207,7 @@ const SettingsForm = () => {
           name="workspaceName"
           value={workspaceDetails ? workspaceDetails.title : ''}
           placeholder="Workspace Name"
-        //   onChange={workspaceNameChange}
+          onChange={workspaceNameChange}
         />
         <Label
           htmlFor="workspaceLogo"
@@ -373,7 +373,10 @@ const SettingsForm = () => {
             onClick={async () => {
               if (!workspaceId) return;
               await deleteWorkspace(workspaceId);
-              toast({ title: 'Successfully deleted your workspae' });
+              toast({ 
+                title: 'Successfully deleted your workspace',
+                description: 'Your workspace and all associated data have been permanently deleted.' 
+              });
               dispatch({ type: 'DELETE_WORKSPACE', payload: workspaceId });
               router.replace('/dashboard');
             }}

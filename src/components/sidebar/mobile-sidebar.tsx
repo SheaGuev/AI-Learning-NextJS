@@ -5,7 +5,7 @@ import ll from '../icons/ll';
 import clsx from 'clsx';
 
 interface MobileSidebarProps {
-  children: React.ReactNode;
+  children: React.ReactNode; 
 }
 
 export const nativeNavigations = [
@@ -22,7 +22,12 @@ export const nativeNavigations = [
 ] as const;
 
 const MobileSidebar: React.FC<MobileSidebarProps> = ({ children }) => {
-  const [selectedNav, setSelectedNav] = useState('');
+  const [selectedNav, setSelectedNav] = useState<string>('');
+  
+  const toggleSidebar = (navId: string) => {
+    setSelectedNav(prevNav => prevNav === navId ? '' : navId);
+  };
+
   return (
     <>
       {selectedNav === 'sidebar' && <>{children}</>}
@@ -49,13 +54,12 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ children }) => {
               items-center
               flex-col
               justify-center
+              cursor-pointer
             "
               key={item.id}
-              onClick={() => {
-                setSelectedNav(item.id);
-              }}
+              onClick={() => toggleSidebar(item.id)}
             >
-              <item.customIcon></item.customIcon>
+              <item.customIcon />
               <small
                 className={clsx('', {
                   'text-muted-foreground': selectedNav !== item.id,
