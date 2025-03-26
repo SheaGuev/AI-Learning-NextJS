@@ -202,6 +202,18 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
     };
   }, [fileId, quill, supabase, user]);
 
+  // Add this effect after quill initialization
+  React.useEffect(() => {
+    if (!quill) return;
+    
+    // Only add empty lines if the editor is empty
+    if (quill.getLength() <= 1) { // Quill always has at least 1 character (newline)
+      // Insert 20 empty lines
+      const emptyLines = Array(20).fill('\n').join('');
+      quill.setText(emptyLines);
+    }
+  }, [quill]);
+
   return (
     <>
       <div className="relative">
@@ -238,7 +250,7 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
         />
         
         {/* Instructions for slash command */}
-        <div className="text-sm text-gray-500 max-w-[800px] w-full mb-2 text-left">
+        <div className="text-sm text-gray-500 max-w-[800px] w-full mb-2 text-left ml-6">
           Type <kbd className="px-2 py-1 bg-gray-100 rounded">/</kbd> for commands
           
           {/* Debug button for slash commands */}

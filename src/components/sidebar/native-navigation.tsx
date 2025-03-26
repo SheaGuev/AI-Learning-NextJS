@@ -23,19 +23,20 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
 }) => {
   return (
     <nav className={twMerge('my-2', className)}>
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-3">
         <li>
           <Link
             className="group/native
             flex
+            items-center
             text-Neutrals/neutrals-7
             transition-all
             gap-2
           "
             href={`/dashboard/${myWorkspaceId}`}
           >
-            <FiHome />
-            <span>My Workspace</span>
+            <FiHome className="h-5 w-5" />
+            <span>Dashboard</span>
           </Link>
         </li>
 
@@ -43,13 +44,14 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
           <li
             className="group/native
             flex
+            items-center
             text-Neutrals/neutrals-7
             transition-all
             gap-2
             cursor-pointer
           "
           >
-            <FiSettings />
+            <FiSettings className="h-5 w-5" />
             <span>Settings</span>
           </li>
         </Settings>
@@ -58,12 +60,13 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
           <li
             className="group/native
             flex
+            items-center
             text-Neutrals/neutrals-7
             transition-all
             gap-2
           "
           >
-            <FiTrash2 />
+            <FiTrash2 className="h-5 w-5" />
             <span>Trash</span>
           </li>
         </Trash>

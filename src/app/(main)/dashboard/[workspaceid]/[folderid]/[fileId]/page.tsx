@@ -11,7 +11,7 @@ const File = async ({ params }: { params: Promise<{ fileId: string }> }) => {
   if (error || !data.length) redirect('/dashboard');
 
   return (
-    <div className="relative ">
+    <div className="relative p-2">
       <QuillEditor
         dirType="file"
         fileId={fileId}
