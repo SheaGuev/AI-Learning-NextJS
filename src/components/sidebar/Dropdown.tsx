@@ -709,7 +709,12 @@ const Dropdown: React.FC<DropdownProps> = ({
                       {iconId}
                     </div>
                   </EmojiPicker>
-                  <span className="text-sm">{folderTitle || fileTitle}</span>
+                  <span 
+                    className="text-sm cursor-pointer"
+                    onDoubleClick={handleDoubleClick}
+                  >
+                    {folderTitle || fileTitle}
+                  </span>
                 </div>
               </div>
             ) : (
