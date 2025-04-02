@@ -15,14 +15,21 @@ export async function actionLoginUser({
     email,
     password,
   }: z.infer<typeof loginFormSchema>) {
-    const supabase = await createSClient();
+    try {
+      const supabase = await createSClient();
 
-
-    const response = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return response;
+      const response = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return response;
+    } catch (error) {
+      console.error('Login error:', error);
+      return { 
+        data: { user: null, session: null }, 
+        error: { message: error instanceof Error ? error.message : 'An unexpected error occurred during login' } 
+      };
+    }
   }
   
 
@@ -33,24 +40,26 @@ export async function actionLoginUser({
   }: z.infer<typeof loginFormSchema>) {
 
     try{
-    const supabase = await createSClient();
-    const { data } = await supabase.from('users').select('*').ilike('email', email).throwOnError();
+      const supabase = await createSClient();
+      const { data } = await supabase.from('users').select('*').ilike('email', email).throwOnError();
 
-    if (data?.length) return { error: { message: 'User already exists', data } };
+      if (data?.length) return { error: { message: 'User already exists', data } };
 
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}email`,
-      },
-    });
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}email`,
+        },
+      });
 
-    if (signUpError) {
-      return { error: { message: 'Sign-up failed', details: signUpError } };
+      if (signUpError) {
+        return { error: { message: 'Sign-up failed', details: signUpError } };
+      }
+
+      return { data: signUpData };
+    } catch (error) {
+      console.error('Signup error:', error);
+      return { error: { message: 'Unexpected error occurred', details: error } };
     }
-
-    return { data: signUpData };
-  } catch (error) {
-    return { error: { message: 'Unexpected error occurred', details: error } };
-  }}
+  }

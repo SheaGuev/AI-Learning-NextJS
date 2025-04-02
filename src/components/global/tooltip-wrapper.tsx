@@ -15,7 +15,14 @@ const TooltipWrapper:React.FC<TooltipWrapperProps> = ({children, tooltip}) => {
             <TooltipTrigger>
                 {children}
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent 
+              className="z-[100] !visible" 
+              style={{ zIndex: 100 }}
+              sideOffset={5}
+              onPointerDownOutside={(e) => {
+                console.log(`Tooltip "${tooltip}" pointer outside:`, e.target);
+              }}
+            >
                 {tooltip}
             </TooltipContent>
         </Tooltip>

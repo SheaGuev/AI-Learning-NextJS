@@ -37,12 +37,30 @@ const LoginPage = () => {
   const onSubmit: SubmitHandler<z.infer<typeof loginFormSchema>> = async (
     formData
   ) => {
-    const { error } = await actionLoginUser(formData);
-    if (error) {
+    try {
+      const result = await actionLoginUser(formData);
+      
+      if (!result) {
+        // Handle case where server action returned undefined (server deployment changed)
+        setSubmitError('Session expired. Please refresh the page and try again.');
+        form.reset();
+        return;
+      }
+      
+      const { error } = result;
+      
+      if (error) {
+        form.reset();
+        setSubmitError(error.message);
+        return;
+      }
+      
+      router.replace('/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      setSubmitError('An unexpected error occurred. Please try again.');
       form.reset();
-      setSubmitError(error.message);
     }
-    router.replace('/dashboard');
   };
 
   return (

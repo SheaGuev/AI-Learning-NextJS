@@ -1,8 +1,17 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/server-actions/middleware'
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  // Create NextResponse object via the updateSession function
+  const response = await updateSession(request);
+  
+  // Add CORS headers to allow server actions to work properly
+  // Needed to avoid issues with "unexpected response from server"
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  return response;
 }
 
 export const config = {

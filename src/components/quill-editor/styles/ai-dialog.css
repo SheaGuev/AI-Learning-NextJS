@@ -1,0 +1,194 @@
+.ai-prompt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.ai-prompt-dialog {
+  background-color: #1e1e2e;
+  color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  width: 500px;
+  max-width: 90vw;
+  overflow: hidden;
+}
+
+.ai-prompt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #333340;
+}
+
+.ai-prompt-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+}
+
+.ai-prompt-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #d1d5db;
+}
+
+.ai-prompt-body {
+  padding: 20px;
+}
+
+.ai-prompt-body label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #f3f4f6;
+}
+
+.ai-prompt-input {
+  width: 100%;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 14px;
+  resize: vertical;
+  background-color: #2e2e3e;
+  color: white;
+}
+
+.ai-prompt-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3);
+}
+
+.ai-prompt-body p {
+  color: #d1d5db;
+}
+
+.ai-prompt-body a {
+  color: #a78bfa !important;
+}
+
+/* Text length selector styles */
+.text-length-selector {
+  margin-top: 16px;
+}
+
+.length-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #f3f4f6;
+}
+
+.length-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.length-option {
+  display: flex;
+  align-items: center;
+  flex: 1 0 calc(50% - 4px);
+  min-width: calc(50% - 4px);
+  cursor: pointer;
+  position: relative;
+}
+
+.length-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.length-option-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background-color: #2e2e3e;
+  border: 1px solid #4b5563;
+  transition: all 0.2s ease;
+}
+
+.length-option input[type="radio"]:checked + .length-option-content {
+  background-color: rgba(139, 92, 246, 0.2);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 1px #8b5cf6;
+}
+
+.length-option-label {
+  font-weight: 500;
+  font-size: 14px;
+  color: white;
+}
+
+.length-option-description {
+  font-size: 12px;
+  color: #a1a1aa;
+  margin-top: 2px;
+}
+
+.ai-prompt-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #333340;
+}
+
+.ai-prompt-cancel-btn,
+.ai-prompt-submit-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-prompt-cancel-btn {
+  background-color: transparent;
+  border: 1px solid #4b5563;
+  color: #e5e7eb;
+}
+
+.ai-prompt-submit-btn {
+  background-color: #8b5cf6;
+  border: 1px solid #8b5cf6;
+  color: white;
+}
+
+.ai-prompt-submit-btn:hover {
+  background-color: #7c3aed;
+}
+
+.ai-prompt-submit-btn:disabled {
+  background-color: #4c1d95;
+  border-color: #4c1d95;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ai-generator-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+} 
