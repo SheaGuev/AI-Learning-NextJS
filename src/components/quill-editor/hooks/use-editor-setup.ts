@@ -163,7 +163,7 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
               }
             },
             placeholder: 'Start writing or type "/" for commands...',
-            formats: ['header', 'list', 'blockquote', 'code-block', 'hr', 'callout'],
+            formats: ['bold', 'italic', 'underline', 'strike', 'header', 'list', 'blockquote', 'code-block', 'hr', 'callout', 'script', 'indent', 'direction', 'size', 'color', 'background', 'font', 'align'],
           });
           
           // Verify modules are loaded

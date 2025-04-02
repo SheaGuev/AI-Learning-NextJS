@@ -13,14 +13,14 @@ const DocumentTitle: React.FC<DocumentTitleProps> = ({
   onIconChange
 }) => {
   return (
-    <div className="w-full self-center max-w-[800px] flex flex-col px-7 lg:my-8">
-      <div className="text-[80px]">
+    <div className="w-full self-start max-w-[1200px] flex flex-col px-2 lg:my-6">
+      <div className="text-[65px]">
         <EmojiPicker getValue={onIconChange}>
-          <div
-            className="w-[100px]
+          <span
+            className="w-[80px]
             cursor-pointer
             transition-colors
-            h-[100px]
+            h-[80px]
             flex
             items-center
             justify-center
@@ -28,7 +28,7 @@ const DocumentTitle: React.FC<DocumentTitleProps> = ({
             rounded-xl"
           >
             {iconId}
-          </div>
+          </span>
         </EmojiPicker>
       </div>
       <span
@@ -37,7 +37,8 @@ const DocumentTitle: React.FC<DocumentTitleProps> = ({
         text-3xl
         font-bold
         h-9
-        m-3
+        ml-2
+        mt-4
       "
       >
         {title}

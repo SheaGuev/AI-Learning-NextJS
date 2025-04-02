@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { FiSend, FiFolder, FiFile, FiChevronRight, FiChevronDown, FiCheckSquare, FiSquare } from 'react-icons/fi';
 import { useAppState } from '@/lib/providers/state-provider';
-import { getFiles, getFolders } from '@/supabase/queries';
+import { getFiles, getFolders, getFileDetails } from '@/supabase/queries';
 import { createSClient } from '@/lib/server-actions/createServerClient';
 import { File, Folder } from '@/supabase/supabase';
+import { useGemini } from '@/lib/hooks/useGemini';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -19,6 +20,11 @@ interface FileItem extends File {
 interface FolderItem extends Folder {
   type: 'folder';
   children?: (FileItem | FolderItem)[];
+}
+
+interface FileContext {
+  title: string;
+  content: string;
 }
 
 // Component to render file tree
@@ -86,6 +92,9 @@ const AiTutor: React.FC = () => {
   const [selectedCount, setSelectedCount] = useState(0);
   const [fileStructure, setFileStructure] = useState<(FileItem | FolderItem)[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
+  const { generateResponse, isLoading: isGenerating, error: apiError, setApiKey } = useGemini();
+  const [apiKey, setApiKeyInput] = useState('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
 
   // Load folders and files from database
   useEffect(() => {
@@ -197,21 +206,52 @@ const AiTutor: React.FC = () => {
       .filter(Boolean);
   };
 
+  // Get file content for a selected file by its ID
+  const getFileContent = async (fileId: string): Promise<FileContext | null> => {
+    try {
+      const { data, error } = await getFileDetails(fileId);
+      
+      if (error || !data || data.length === 0 || !data[0].data) {
+        console.error('Error fetching file content:', error || 'No data returned');
+        return null;
+      }
+      
+      return {
+        title: data[0].title,
+        content: data[0].data || 'No content available'
+      };
+    } catch (error) {
+      console.error('Error fetching file content:', error);
+      return null;
+    }
+  };
+
+  // Get content for all selected files
+  const getSelectedFilesContent = async (): Promise<FileContext[]> => {
+    const selectedFileIds = Object.entries(selectedFiles)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([id]) => id);
+    
+    const fileContents: FileContext[] = [];
+    
+    for (const fileId of selectedFileIds) {
+      const fileContext = await getFileContent(fileId);
+      if (fileContext) {
+        fileContents.push(fileContext);
+      }
+    }
+    
+    return fileContents;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-
-    const selectedFileNames = getSelectedFileNames();
-    const contextPrefix = selectedFileNames.length > 0 
-      ? `[Context: ${selectedFileNames.join(', ')}]\n` 
-      : '';
-
+    
     // Add user message to chat
     const userMessage: Message = { 
       role: 'user', 
-      content: selectedFileNames.length > 0 
-        ? `${contextPrefix}${input}`
-        : input 
+      content: input 
     };
     
     setMessages(prev => [...prev, userMessage]);
@@ -219,34 +259,41 @@ const AiTutor: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // TODO: Replace with your actual API endpoint
-      const response = await fetch('/api/ai-tutor', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: input,
-          context: selectedFileNames
-        }),
-      });
-
-      const data = await response.json();
+      // Get content of selected files
+      const selectedFilesContent = await getSelectedFilesContent();
+      
+      // Call Gemini API with file content as context
+      const response = await generateResponse(input, selectedFilesContent);
+      
       const assistantMessage: Message = {
         role: 'assistant',
-        content: data.response || "I'm currently in development mode. I'll be able to help you with your code soon!",
+        content: response,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
-      // Add fallback response in case of error
+      
+      // If error is due to missing API key, prompt user to enter key
+      if (error.message.includes('API key is required') || error.message.includes('API key')) {
+        setShowApiKeyInput(true);
+      }
+      
+      // Add error message to chat
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: "I'm currently in development mode. I'll be able to help you with your code soon!" 
+        content: `Error: ${error.message || "Something went wrong. Please try again."}`
       }]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveApiKey = () => {
+    if (apiKey.trim()) {
+      setApiKey(apiKey.trim());
+      setShowApiKeyInput(false);
+      setApiKeyInput('');
     }
   };
 
@@ -254,9 +301,38 @@ const AiTutor: React.FC = () => {
     <div className="flex h-[400px] w-full max-w-6xl bg-gray-900 rounded-lg shadow-lg border border-gray-700">
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        <div className="p-3 border-b border-gray-700">
+        <div className="p-3 border-b border-gray-700 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">AI Tutor</h2>
+          <button
+            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+            className="text-xs text-blue-400 hover:text-blue-300"
+          >
+            {showApiKeyInput ? 'Hide API Key' : 'Set API Key'}
+          </button>
         </div>
+        
+        {showApiKeyInput && (
+          <div className="p-3 border-b border-gray-700 bg-gray-800">
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="Enter your Gemini API key"
+                className="flex-1 p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white placeholder-gray-400"
+              />
+              <button
+                onClick={handleSaveApiKey}
+                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                Save
+              </button>
+            </div>
+            <div className="mt-1 text-xs text-gray-400">
+              Get your API key at: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">aistudio.google.com/app/apikey</a>
+            </div>
+          </div>
+        )}
         
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-900">
           {messages.map((message, index) => (

@@ -705,9 +705,9 @@ const Dropdown: React.FC<DropdownProps> = ({
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2 text-sm">
                   <EmojiPicker getValue={onChangeEmoji}>
-                    <div className="w-[24px] h-[24px] flex items-center justify-center">
+                    <span className="w-[24px] h-[24px] flex items-center justify-center">
                       {iconId}
-                    </div>
+                    </span>
                   </EmojiPicker>
                   <span 
                     className="text-sm cursor-pointer"
@@ -720,9 +720,9 @@ const Dropdown: React.FC<DropdownProps> = ({
             ) : (
               <div className="flex items-center gap-2">
                 <EmojiPicker getValue={onChangeEmoji}>
-                  <div className="w-[24px] h-[24px] flex items-center justify-center">
+                  <span className="w-[24px] h-[24px] flex items-center justify-center">
                     {iconId}
-                  </div>
+                  </span>
                 </EmojiPicker>
                 <input
                   type="text"
@@ -749,8 +749,8 @@ const Dropdown: React.FC<DropdownProps> = ({
           </div>
           <div className={hoverStyles}>
             <TooltipWrapper tooltip="Delete">
-              <div
-                className="p-1 hover:bg-slate-600 rounded-full transition-colors"
+              <span
+                className="p-1 hover:bg-slate-600 rounded-full transition-colors inline-flex"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (listType === 'file') {
@@ -786,17 +786,18 @@ const Dropdown: React.FC<DropdownProps> = ({
                   size={15}
                   className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
                 />
-              </div>
+              </span>
             </TooltipWrapper>
             {listType === 'folder' && !isEditing && (
               <TooltipWrapper tooltip="Add File">
-                <div
+                <span
                   onClick={(e) => {
                     e.stopPropagation();
                     addNewFile();
                   }}
                   role="button"
                   tabIndex={0}
+                  className="inline-flex"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
@@ -808,7 +809,7 @@ const Dropdown: React.FC<DropdownProps> = ({
                     size={15}
                     className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
                   />
-                </div>
+                </span>
               </TooltipWrapper>
             )}
           </div>

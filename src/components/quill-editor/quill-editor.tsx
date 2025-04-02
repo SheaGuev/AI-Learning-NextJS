@@ -241,7 +241,7 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
       />
       
       {/* Document content area */}
-      <div className="flex justify-center items-center flex-col mt-2 relative">
+      <div className="flex justify-start items-start flex-col mt-2 relative w-full px-2">
         {/* Document title and icon */}
         <DocumentTitle
           title={details.title}
@@ -250,7 +250,7 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
         />
         
         {/* Instructions for slash command */}
-        <div className="text-sm text-gray-500 max-w-[800px] w-full mb-2 text-left ml-6">
+        <div className="text-sm text-gray-500 max-w-[1200px] w-full mb-2 text-left pl-5">
           Type <kbd className="px-2 py-1 bg-gray-100 rounded">/</kbd> for commands
           
           {/* Debug button for slash commands */}
@@ -299,7 +299,7 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
         {/* Quill editor container */}
         <div
           id="container"
-          className="max-w-[800px] w-full"
+          className="max-w-[1200px] w-full pl-2"
           ref={wrapperRef}
         ></div>
       </div>

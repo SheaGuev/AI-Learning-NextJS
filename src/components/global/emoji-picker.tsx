@@ -37,7 +37,7 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ children, getValue }) => {
   return (
     <div className="flex items-center">
       <Popover>
-        <PopoverTrigger className="cursor-pointer">{children}</PopoverTrigger>
+        <PopoverTrigger asChild className="cursor-pointer">{children}</PopoverTrigger>
         <PopoverContent className="p-2 w-[240px] border-none">
           <div className="grid grid-cols-6 gap-2">
             {SAFE_EMOJIS.map((emoji) => (

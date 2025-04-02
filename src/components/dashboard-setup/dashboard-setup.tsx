@@ -145,7 +145,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
             >
               <div className="text-5xl">
                 <EmojiPicker getValue={(emoji) => setSelectedEmoji(emoji)}>
-                  {selectedEmoji}
+                  <span className="cursor-pointer inline-flex">{selectedEmoji}</span>
                 </EmojiPicker>
               </div>
               <div className="w-full ">
