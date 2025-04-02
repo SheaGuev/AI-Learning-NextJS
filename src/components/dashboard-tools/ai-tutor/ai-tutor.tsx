@@ -7,6 +7,10 @@ import { getFiles, getFolders, getFileDetails } from '@/supabase/queries';
 import { createSClient } from '@/lib/server-actions/createServerClient';
 import { File, Folder } from '@/supabase/supabase';
 import { useGemini } from '@/lib/hooks/useGemini';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { atomDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -79,6 +83,53 @@ const FileTree: React.FC<{
         </li>
       ))}
     </ul>
+  );
+};
+
+// Create a separate markdown renderer component to handle the rendering logic
+const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+  return (
+    <div className="prose prose-invert prose-sm max-w-none">
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code: ({ className, children, ...props }) => {
+            const match = /language-(\w+)/.exec(className || '');
+            const isInline = !match;
+            
+            return isInline ? (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            ) : (
+              <div className="rounded-md text-sm">
+                <SyntaxHighlighter
+                  style={atomDark}
+                  language={match[1]}
+                  PreTag="div"
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              </div>
+            );
+          },
+          p: ({ children }) => <p className="mb-2">{children}</p>,
+          ul: ({ children }) => <ul className="list-disc ml-6 mb-2">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal ml-6 mb-2">{children}</ol>,
+          li: ({ children }) => <li className="mb-1">{children}</li>,
+          h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-lg font-bold mb-2">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-md font-bold mb-2">{children}</h3>,
+          a: ({ href, children }) => (
+            <a href={href} className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          )
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 };
 
@@ -349,7 +400,11 @@ const AiTutor: React.FC = () => {
                     : 'bg-gray-800 text-gray-100'
                 }`}
               >
-                {message.content}
+                {message.role === 'user' ? (
+                  message.content
+                ) : (
+                  <MarkdownRenderer content={message.content} />
+                )}
               </div>
             </div>
           ))}

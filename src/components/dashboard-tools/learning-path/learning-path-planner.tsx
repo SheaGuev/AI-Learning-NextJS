@@ -1,13 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RiCalendarLine, RiRoadMapLine, RiSendPlane2Line, RiAddLine, RiFileAddLine, RiUploadCloud2Line } from 'react-icons/ri';
+import { RiCalendarLine, RiRoadMapLine, RiSendPlane2Line, RiAddLine, RiFileAddLine, RiUploadCloud2Line, RiEdit2Line } from 'react-icons/ri';
 import { useGemini } from '@/lib/hooks/useGemini';
 import { useAppState } from '@/lib/providers/state-provider';
 import { createFile, getFolders, createFolder } from '@/supabase/queries';
 import { v4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 import { extractContentFromFileData, parseUploadedPlan } from './learning-path-helpers';
+import { getDocument, GlobalWorkerOptions, PDFDocumentProxy, version } from 'pdfjs-dist';
+
+// Configure PDF.js worker - use a relative path for reliability
+// This loads the worker from the public directory
+GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 interface LearningModule {
   title: string;
@@ -41,6 +46,9 @@ const LearningPathPlanner: React.FC = () => {
   const { toast } = useToast();
   const [goal, setGoal] = useState('');
   const [timeframe, setTimeframe] = useState('2 weeks');
+  const [customTimeframe, setCustomTimeframe] = useState('');
+  const [showCustomTimeframe, setShowCustomTimeframe] = useState(false);
+  const [sliderPosition, setSliderPosition] = useState(30); // Default slider position (0-100)
   const [includeSchedule, setIncludeSchedule] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [learningPlan, setLearningPlan] = useState<LearningPlan | null>(null);
@@ -55,6 +63,84 @@ const LearningPathPlanner: React.FC = () => {
   const [pdfProcessingState, setPdfProcessingState] = useState<'idle' | 'extracting' | 'generating'>('idle');
   const [showTextPasteModal, setShowTextPasteModal] = useState(false);
   const [pastedText, setPastedText] = useState('');
+
+  // Define preset timeframes for the slider with their positions and labels
+  const sliderPresets = [
+    { position: 0, days: 1, label: '1 day' },
+    { position: 20, days: 7, label: '1 week' },
+    { position: 40, days: 30, label: '1 month' },
+    { position: 60, days: 90, label: '3 months' },
+    { position: 80, days: 180, label: '6 months' },
+    { position: 100, days: 365, label: '1 year' }
+  ];
+
+  // Convert slider position (0-100) to days
+  const getDaysFromSliderPosition = (position: number): number => {
+    // Find the two closest presets
+    for (let i = 0; i < sliderPresets.length - 1; i++) {
+      const lower = sliderPresets[i];
+      const upper = sliderPresets[i + 1];
+      
+      if (position >= lower.position && position <= upper.position) {
+        // Calculate days based on linear interpolation between preset points
+        const positionRatio = (position - lower.position) / (upper.position - lower.position);
+        return Math.round(lower.days + positionRatio * (upper.days - lower.days));
+      }
+    }
+    
+    // Default for any edge cases
+    return sliderPresets[sliderPresets.length - 1].days;
+  };
+
+  // Convert days to human-readable timeframe
+  const getTimeframeFromDays = (days: number): string => {
+    if (days === 1) {
+      return '1 day';
+    } else if (days < 7) {
+      return `${days} days`;
+    } else if (days === 7) {
+      return '1 week';
+    } else if (days < 30) {
+      const weeks = Math.round(days / 7);
+      return `${weeks} week${weeks === 1 ? '' : 's'}`;
+    } else if (days === 30) {
+      return '1 month';
+    } else if (days < 365) {
+      const months = Math.round(days / 30);
+      return `${months} month${months === 1 ? '' : 's'}`;
+    } else {
+      return '1 year';
+    }
+  };
+
+  // Handle slider change
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const position = parseInt(e.target.value);
+    setSliderPosition(position);
+    const days = getDaysFromSliderPosition(position);
+    setTimeframe(getTimeframeFromDays(days));
+    setShowCustomTimeframe(false);
+  };
+
+  // Handle toggle for custom timeframe
+  const toggleCustomTimeframe = () => {
+    setShowCustomTimeframe(!showCustomTimeframe);
+    if (showCustomTimeframe) {
+      // If turning off custom, reset to slider value
+      const days = getDaysFromSliderPosition(sliderPosition);
+      setTimeframe(getTimeframeFromDays(days));
+    }
+  };
+
+  const handleCustomTimeframeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomTimeframe(e.target.value);
+    setTimeframe(e.target.value);
+  };
+
+  // Get the current days value from the slider position
+  const getCurrentDays = (): number => {
+    return getDaysFromSliderPosition(sliderPosition);
+  };
 
   useEffect(() => {
     // Try to load API key from localStorage on mount
@@ -128,48 +214,80 @@ const LearningPathPlanner: React.FC = () => {
     
     if (!goal.trim()) return;
     
+    // Validate custom timeframe
+    if (showCustomTimeframe && !customTimeframe.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a custom timeframe',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setIsLoading(true);
     setLearningPlan(null);
     setRawResponse(null);
     setShowRawResponse(false);
 
     try {
-      // Create the improved prompt for the AI
-      const prompt = `Create a detailed learning path for: "${goal}". 
-      The learning path should be structured for a timeframe of ${timeframe}. 
-      ${includeSchedule ? 'Please include a suggested study schedule.' : ''}
+      // Get current timeframe and determine appropriate schedule units
+      const currentTimeframe = showCustomTimeframe ? customTimeframe : timeframe;
+      let schedulePeriodType = "days";
       
-      IMPORTANT: Your response MUST be valid JSON that strictly follows this structure:
-      {
-        "title": "Learning path title",
-        "description": "Brief description of the learning goal and approach",
-        "modules": [
-          {
-            "title": "Module title",
-            "description": "Brief description of this module",
-            "estimatedTime": "Estimated time to complete this module",
-            "topics": [
-              {
-                "title": "Topic title",
-                "subtopics": ["Subtopic 1", "Subtopic 2"],
-                "resources": ["Resource 1", "Resource 2"],
-                "activities": ["Activity 1", "Activity 2"]
-              }
-            ]
-          }
-        ]${includeSchedule ? ',\n        "schedule": [\n          {\n            "day": "Day 1",\n            "topics": ["Topic 1", "Topic 2"],\n            "duration": "2 hours"\n          }\n        ]' : ''}
+      // Get the numeric value from timeframe
+      const timeNumber = extractNumber(currentTimeframe);
+      
+      // Determine appropriate time units based on overall timeframe
+      if (currentTimeframe.includes('month') || 
+          (currentTimeframe.includes('week') && timeNumber > 6) ||
+          (timeNumber > 45 && !currentTimeframe.includes('hour'))) {
+        schedulePeriodType = "weeks";
+      } else if (currentTimeframe.includes('day') || 
+                (currentTimeframe.includes('week') && timeNumber <= 6)) {
+        schedulePeriodType = "days";
+      } else if ((currentTimeframe.includes('month') && timeNumber > 3) || 
+                currentTimeframe.includes('year')) {
+        schedulePeriodType = "months";
       }
-      
-      FORMATTING REQUIREMENTS:
-      1. ALL property names must be in double quotes: "property": value
-      2. ALL string values must be in double quotes: "property": "value"
-      3. Arrays must use square brackets: "array": ["item1", "item2"]
-      4. No trailing commas in arrays or objects: ["item1", "item2"] NOT ["item1", "item2",]
-      5. Proper nesting of braces and brackets
-      6. No comments or additional text before or after the JSON
-      7. No markdown formatting or code blocks around the JSON
-      
-      Return ONLY the JSON object with NO additional text before or after it.`;
+
+      // Create a simplified prompt for the AI
+      const prompt = `Create a learning path for "${goal}" over ${currentTimeframe}.
+${includeSchedule ? `Include a study schedule using ${schedulePeriodType} (${schedulePeriodType === 'days' ? 'Day 1, Day 2' : schedulePeriodType === 'weeks' ? 'Week 1, Week 2' : 'Month 1, Month 2'})` : ''}
+
+Return ONLY this JSON structure with no additional text:
+{
+  "title": "Learning Path Title",
+  "description": "Clear description",
+  "modules": [
+    {
+      "title": "Module Title",
+      "description": "Module description",
+      "estimatedTime": "Time estimate",
+      "topics": [
+        {
+          "title": "Topic Title",
+          "subtopics": ["Subtopic 1", "Subtopic 2"],
+          "resources": ["Resource 1", "Resource 2"],
+          "activities": ["Activity 1", "Activity 2"]
+        }
+      ]
+    }
+  ]${includeSchedule ? `,
+  "schedule": [
+    {
+      "day": "${schedulePeriodType === 'days' ? 'Day' : schedulePeriodType === 'weeks' ? 'Week' : 'Month'} 1",
+      "topics": ["Topic from module 1"],
+      "duration": "2 hours"
+    }
+  ]` : ''}
+}
+
+5 Rules:
+1. Use double quotes for ALL names and values
+2. NO trailing commas
+3. Valid JSON only
+4. NO text before or after the JSON
+5. NO markdown code blocks`;
 
       const response = await generateResponse(prompt);
       
@@ -261,6 +379,146 @@ const LearningPathPlanner: React.FC = () => {
     }
   };
 
+  // Helper function to safely extract number from a string
+  const extractNumber = (text: string): number => {
+    const match = text.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+  };
+
+  // *** Function to generate plan from extracted text (e.g., from file or PDF) ***
+  const generatePlanFromText = async (extractedText: string) => {
+    setPdfProcessingState('generating');
+    setIsLoading(true);
+    setLearningPlan(null);
+    setRawResponse(null);
+    setShowRawResponse(false);
+
+    try {
+      // Get current timeframe and determine appropriate schedule units
+      const currentTimeframe = showCustomTimeframe ? customTimeframe : timeframe;
+      let schedulePeriodType = "days";
+      
+      // Get the numeric value from timeframe
+      const timeNumber = extractNumber(currentTimeframe);
+      
+      // Determine appropriate time units based on overall timeframe
+      if (currentTimeframe.includes('month') || 
+          (currentTimeframe.includes('week') && timeNumber > 6) ||
+          (timeNumber > 45 && !currentTimeframe.includes('hour'))) {
+        schedulePeriodType = "weeks";
+      } else if (currentTimeframe.includes('day') || 
+                (currentTimeframe.includes('week') && timeNumber <= 6)) {
+        schedulePeriodType = "days";
+      } else if ((currentTimeframe.includes('month') && timeNumber > 3) || 
+                currentTimeframe.includes('year')) {
+        schedulePeriodType = "months";
+      }
+
+      // Simpler, more direct prompt
+      const prompt = `Create a learning path in JSON format for this content:
+
+\`\`\`
+${extractedText}
+\`\`\`
+
+Return ONLY this JSON structure with no additional text:
+{
+  "title": "Learning Path Title",
+  "description": "Clear description",
+  "modules": [
+    {
+      "title": "Module Title",
+      "description": "Module description",
+      "estimatedTime": "Time estimate",
+      "topics": [
+        {
+          "title": "Topic Title",
+          "subtopics": ["Subtopic 1", "Subtopic 2"],
+          "resources": ["Resource 1", "Resource 2"],
+          "activities": ["Activity 1", "Activity 2"]
+        }
+      ]
+    }
+  ]${includeSchedule ? `,
+  "schedule": [
+    {
+      "day": "${schedulePeriodType === 'days' ? 'Day' : schedulePeriodType === 'weeks' ? 'Week' : 'Month'} 1",
+      "topics": ["Topic from module 1"],
+      "duration": "2 hours"
+    }
+  ]` : ''}
+}
+
+Instructions:
+1. Use double quotes for all property names and string values
+2. For the schedule, use ${schedulePeriodType} (${schedulePeriodType === 'days' ? 'Day 1, Day 2' : schedulePeriodType === 'weeks' ? 'Week 1, Week 2' : 'Month 1, Month 2'})
+3. Create a plan for ${currentTimeframe}
+4. All modules need topics with subtopics
+5. Return ONLY valid JSON, no text before or after`;
+
+      const response = await generateResponse(prompt);
+      setRawResponse(response);
+
+      try {
+        // Extract JSON from response, removing any markdown formatting or extra text
+        const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || response.match(/```\n([\s\S]*?)\n```/) || [null, response];
+        let jsonString = jsonMatch[1] || response;
+        
+        // Remove any non-JSON content before the first { or after the last }
+        jsonString = jsonString.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+        
+        try {
+          // First attempt to parse directly
+          const parsedPlan = JSON.parse(jsonString);
+          setLearningPlan(parsedPlan);
+        } catch (parseError) {
+          console.error('Initial JSON parsing error:', parseError);
+          
+          // Try automatic JSON repair strategies
+          try {
+            // Fix common JSON issues
+            const fixedJson = attemptAdvancedJsonRepair(jsonString);
+            try {
+              const parsedPlan = JSON.parse(fixedJson);
+              console.log('Successfully parsed JSON after repairs');
+              setLearningPlan(parsedPlan);
+            } catch (secondError) {
+              console.error('Failed to parse JSON after repairs:', secondError);
+              await repairJsonWithAI(jsonString);
+            }
+          } catch (repairError) {
+            console.error('Error during JSON repair:', repairError);
+            await repairJsonWithAI(jsonString);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing AI response:', error);
+        setShowRawResponse(true);
+        toast({
+          title: 'JSON Error',
+          description: 'Error processing the AI response. Attempting repair...',
+          variant: 'destructive',
+        });
+        await repairJsonWithAI(response);
+      }
+    } catch (error: any) {
+      console.error('Error generating learning path from text:', error);
+      if (error.message?.includes('API key')) {
+        setShowApiKeyInput(true);
+      } else {
+        toast({
+          title: 'Error',
+          description: `Failed to generate plan: ${error.message || 'Unknown error'}`,
+          variant: 'destructive',
+        });
+      }
+      setShowRawResponse(true);
+    } finally {
+      setIsLoading(false);
+      setPdfProcessingState('idle');
+    }
+  };
+
   // New function: Use the AI model to repair broken JSON
   const repairJsonWithAI = async (brokenJson: string) => {
     try {
@@ -270,33 +528,59 @@ const LearningPathPlanner: React.FC = () => {
         description: 'Using AI to fix the JSON format...',
       });
       
-      // Create a repair prompt
-      const repairPrompt = `I received this JSON response that is not properly formatted. 
-      Please fix it to be valid JSON that strictly follows this structure:
-      {
-        "title": "Learning path title",
-        "description": "Brief description of the learning goal and approach",
-        "modules": [
-          {
-            "title": "Module title",
-            "description": "Brief description of this module",
-            "estimatedTime": "Estimated time to complete this module",
-            "topics": [
-              {
-                "title": "Topic title",
-                "subtopics": ["Subtopic 1", "Subtopic 2"],
-                "resources": ["Resource 1", "Resource 2"],
-                "activities": ["Activity 1", "Activity 2"]
-              }
-            ]
-          }
-        ]${includeSchedule ? ',\n        "schedule": [\n          {\n            "day": "Day 1",\n            "topics": ["Topic 1", "Topic 2"],\n            "duration": "2 hours"\n          }\n        ]' : ''}
+      // Get current timeframe and determine appropriate schedule units
+      const currentTimeframe = showCustomTimeframe ? customTimeframe : timeframe;
+      let schedulePeriodType = "days";
+      
+      // Get the numeric value from timeframe
+      const timeNumber = extractNumber(currentTimeframe);
+      
+      // Determine appropriate time units based on overall timeframe
+      if (currentTimeframe.includes('month') || 
+          (currentTimeframe.includes('week') && timeNumber > 6) ||
+          (timeNumber > 45 && !currentTimeframe.includes('hour'))) {
+        schedulePeriodType = "weeks";
+      } else if (currentTimeframe.includes('day') || 
+                (currentTimeframe.includes('week') && timeNumber <= 6)) {
+        schedulePeriodType = "days";
+      } else if ((currentTimeframe.includes('month') && timeNumber > 3) || 
+                currentTimeframe.includes('year')) {
+        schedulePeriodType = "months";
       }
       
-      Here is the broken JSON:
-      ${brokenJson}
-      
-      IMPORTANT: Return ONLY the fixed JSON without ANY explanations, comments, or markdown formatting.`;
+      // Simpler repair prompt
+      const repairPrompt = `Fix this JSON to match this structure exactly:
+{
+  "title": "Title",
+  "description": "Description",
+  "modules": [
+    {
+      "title": "Module title",
+      "description": "Description",
+      "estimatedTime": "Time",
+      "topics": [
+        {
+          "title": "Topic",
+          "subtopics": ["Subtopic"],
+          "resources": ["Resource"],
+          "activities": ["Activity"]
+        }
+      ]
+    }
+  ]${includeSchedule ? `,
+  "schedule": [
+    {
+      "day": "${schedulePeriodType === 'days' ? 'Day' : schedulePeriodType === 'weeks' ? 'Week' : 'Month'} 1",
+      "topics": ["Topic"],
+      "duration": "Duration"
+    }
+  ]` : ''}
+}
+
+Broken JSON:
+${brokenJson}
+
+Return ONLY valid JSON with no explanations.`;
       
       // Send repair request to AI
       const repairResponse = await generateResponse(repairPrompt);
@@ -335,127 +619,6 @@ const LearningPathPlanner: React.FC = () => {
     }
   };
 
-  // *** NEW: Function to generate plan from extracted text (e.g., from PDF) ***
-  const generatePlanFromText = async (extractedText: string) => {
-    setPdfProcessingState('generating');
-    setIsLoading(true);
-    setLearningPlan(null);
-    setRawResponse(null);
-    setShowRawResponse(false);
-
-    try {
-      // Create the prompt for the AI, instructing it to parse the text
-      const prompt = `Analyze the following text extracted from a document (likely a learning plan or syllabus) and create a structured learning path in JSON format.
-
-      Extracted Text:
-      \`\`\`
-      ${extractedText}
-      \`\`\`
-
-      IMPORTANT: Structure the output as a valid JSON object following this schema strictly:
-      {
-        "title": "Appropriate title based on content",
-        "description": "Brief description summarizing the plan",
-        "modules": [
-          {
-            "title": "Module/Week/Section title",
-            "description": "Brief description of this module",
-            "estimatedTime": "Estimated time (if found, otherwise 'N/A')",
-            "topics": [
-              {
-                "title": "Topic title",
-                "subtopics": ["Subtopic 1", "Subtopic 2"],
-                "resources": ["Resource 1", "Resource 2"],
-                "activities": ["Activity 1", "Activity 2"]
-              }
-            ]
-          }
-        ]${includeSchedule ? ',\n        "schedule": [\n          {\n            "day": "Day/Date",\n            "topics": ["Topic 1", "Topic 2"],\n            "duration": "Duration (if found, otherwise \'N/A\')"\n          }\n        ]' : ''}
-      }
-
-      FORMATTING REQUIREMENTS:
-      1. ALL property names must be in double quotes: "property": value
-      2. ALL string values must be in double quotes: "property": "value"
-      3. Arrays must use square brackets: "array": ["item1", "item2"]
-      4. No trailing commas in arrays or objects: ["item1", "item2"] NOT ["item1", "item2",]
-      5. Proper nesting of braces and brackets
-      6. No comments or additional text before or after the JSON
-      7. No markdown formatting or code blocks around the JSON
-
-      Return ONLY the JSON object. Infer structure and details from the provided text as accurately as possible. If schedule details are requested (${includeSchedule}) and present, include them.`;
-
-      const response = await generateResponse(prompt);
-      setRawResponse(response);
-
-      try {
-        const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || response.match(/```\n([\s\S]*?)\n```/) || [null, response];
-        const jsonString = jsonMatch[1] || response;
-        let cleanedJson = jsonString.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-        cleanedJson = cleanedJson.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
-
-        try {
-          const parsedPlan = JSON.parse(cleanedJson);
-          setLearningPlan(parsedPlan);
-        } catch (parseError) {
-          console.error('Initial JSON parsing error (from PDF text):', parseError);
-          try {
-            const fixedJson = cleanedJson
-              .replace(/,\s*}/g, '}')
-              .replace(/,\s*\]/g, ']')
-              .replace(/\}\s*\{/g, '},{')
-              .replace(/\]\s*\[/g, '],[')
-              .replace(/}\s*]/g, '}]')
-              .replace(/"\s*"/g, '","');
-            try {
-              const parsedPlan = JSON.parse(fixedJson);
-              console.log('Successfully parsed JSON (from PDF text) after fixing format issues');
-              setLearningPlan(parsedPlan);
-            } catch (secondError) {
-              console.error('Second JSON parsing attempt (from PDF text) failed:', secondError);
-              const aggressivelyFixedJson = attemptAdvancedJsonRepair(fixedJson);
-              try {
-                const parsedPlan = JSON.parse(aggressivelyFixedJson);
-                console.log('Successfully parsed JSON (from PDF text) after aggressive repairs');
-                setLearningPlan(parsedPlan);
-              } catch (thirdError) {
-                 console.error('Failed to fix/parse JSON (from PDF text) after aggressive repairs:', thirdError);
-                 await repairJsonWithAI(fixedJson);
-              }
-            }
-          } catch (secondError) {
-             console.error('Failed to fix/parse JSON (from PDF text):', secondError);
-             await repairJsonWithAI(cleanedJson);
-          }
-        }
-      } catch (error) {
-        console.error('Error processing AI response (from PDF text):', error);
-        setShowRawResponse(true);
-        toast({
-          title: 'JSON Error',
-          description: 'Error processing the AI response generated from the PDF. Attempting repair...',
-          variant: 'destructive',
-        });
-        await repairJsonWithAI(response);
-      }
-    } catch (error: any) {
-      console.error('Error generating learning path from PDF text:', error);
-      if (error.message.includes('API key')) {
-        setShowApiKeyInput(true);
-      } else {
-        toast({
-          title: 'Error',
-          description: `Failed to generate plan from PDF: ${error.message || 'Unknown error'}`,
-          variant: 'destructive',
-        });
-      }
-      setShowRawResponse(true);
-    } finally {
-      setIsLoading(false);
-      setPdfProcessingState('idle');
-    }
-  };
-  // *** END NEW FUNCTION ***
-
   // *** MODIFIED: Function to handle file upload ***
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -485,17 +648,12 @@ const LearningPathPlanner: React.FC = () => {
            return;
          }
          try {
-           const parsedPlan = parseUploadedPlan(content);
-           if (parsedPlan) {
-             setLearningPlan(parsedPlan);
-             toast({ title: 'Plan Loaded', description: 'Parsed uploaded plan.' });
-           } else {
-              toast({ title: 'Parsing Error', description: 'Could not parse uploaded file.', variant: 'destructive' });
-           }
+           // Send content directly to AI instead of parsing it
+           await generatePlanFromText(content);
          } catch (error: any) {
-           console.error('Error parsing uploaded file:', error);
+           console.error('Error processing uploaded file:', error);
            toast({
-             title: 'Parsing Error',
+             title: 'Processing Error',
              description: `An error occurred: ${error.message || 'Unknown error'}`,
              variant: 'destructive',
            });
@@ -518,21 +676,57 @@ const LearningPathPlanner: React.FC = () => {
     }
     // --- Handle PDF Files ---
     else if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-      setIsFileUploading(false); // No need to keep the loading indicator
-      setPdfProcessingState('idle');
+      setPdfProcessingState('extracting');
       
-      // Show the text paste modal immediately
-      setShowTextPasteModal(true);
-      
-      // Provide guidance to the user
-      toast({ 
-        title: 'PDF Upload', 
-        description: 'Please copy and paste the content from your PDF using the form provided.', 
-        variant: 'default' 
-      });
-      
-      // Reset the file input
-      event.target.value = '';
+      try {
+        // Read PDF file as ArrayBuffer
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // Extract text from PDF
+        const text = await extractTextFromPdf(arrayBuffer);
+        
+        if (text.trim().length === 0) {
+          toast({
+            title: 'PDF Error',
+            description: 'Could not extract text from the PDF. It may be scanned or have content restrictions.',
+            variant: 'destructive',
+          });
+          setPdfProcessingState('idle');
+          setIsFileUploading(false);
+          event.target.value = '';
+          
+          // Offer text paste as fallback
+          setTimeout(() => {
+            setShowTextPasteModal(true);
+            toast({
+              title: 'Try Manual Input',
+              description: 'Please copy and paste the content from your PDF directly.',
+              variant: 'default',
+            });
+          }, 1000);
+          
+          return;
+        }
+        
+        // Process extracted text
+        await generatePlanFromText(text);
+      } catch (error: any) {
+        console.error('Error processing PDF:', error);
+        toast({
+          title: 'PDF Processing Error',
+          description: error.message || 'Failed to process PDF. Please try the manual input option.',
+          variant: 'destructive',
+        });
+        
+        // Fall back to manual text pasting option if automatic extraction fails
+        setTimeout(() => {
+          setShowTextPasteModal(true);
+        }, 1000);
+      } finally {
+        setPdfProcessingState('idle');
+        setIsFileUploading(false);
+        event.target.value = '';
+      }
     }
     // --- Handle Unsupported Files ---
     else {
@@ -546,7 +740,66 @@ const LearningPathPlanner: React.FC = () => {
        event.target.value = '';
     }
   };
-  // *** END MODIFIED FUNCTION ***
+
+  // Function to extract text from PDF
+  const extractTextFromPdf = async (arrayBuffer: ArrayBuffer): Promise<string> => {
+    try {
+      // Load PDF document
+      const loadingTask = getDocument(arrayBuffer);
+      const pdf = await loadingTask.promise;
+      
+      let extractedText = '';
+      
+      // Process each page
+      for (let i = 1; i <= pdf.numPages; i++) {
+        // Update extraction progress message for longer PDFs
+        if (pdf.numPages > 5 && i % 5 === 0) {
+          toast({
+            title: 'PDF Processing',
+            description: `Extracting page ${i} of ${pdf.numPages}...`,
+            variant: 'default',
+          });
+        }
+        
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        
+        // Concatenate text items with proper spacing
+        const pageText = textContent.items
+          .map((item: any) => {
+            if ('str' in item) {
+              return item.str;
+            }
+            return '';
+          })
+          .join(' ');
+        
+        extractedText += pageText + '\n\n';
+      }
+      
+      // Add page count message for better understanding
+      toast({
+        title: 'PDF Processed',
+        description: `Successfully extracted text from ${pdf.numPages} page${pdf.numPages !== 1 ? 's' : ''}.`,
+        variant: 'default',
+      });
+      
+      return extractedText;
+    } catch (error: any) {
+      console.error('Error extracting text from PDF:', error);
+      
+      // Provide more specific error messages based on common failures
+      if (error.message && error.message.includes('worker')) {
+        throw new Error('PDF worker failed to load. Please try refreshing the page or use the text paste option instead.');
+      } else if (error.message && error.message.includes('password')) {
+        throw new Error('The PDF is password protected. Please remove the password and try again, or use the text paste option.');
+      } else if (error.name === 'InvalidPDFException') {
+        throw new Error('The PDF file is invalid or corrupted. Please try another file or use the text paste option.');
+      } else {
+        throw new Error('Failed to extract text from PDF. Please try using the text paste option.');
+      }
+    }
+  };
 
   // Function to handle direct text pasting as an alternative to PDF upload
   const handlePastedTextSubmit = async (e: React.FormEvent) => {
@@ -563,7 +816,7 @@ const LearningPathPlanner: React.FC = () => {
     // Close the modal
     setShowTextPasteModal(false);
     
-    // Process the pasted text similar to PDF extraction
+    // Process the pasted text directly with AI
     await generatePlanFromText(pastedText);
     
     // Reset the state
@@ -1097,18 +1350,64 @@ const LearningPathPlanner: React.FC = () => {
               <label htmlFor="timeframe" className="block text-sm font-medium text-gray-300 mb-1">
                 Available timeframe
               </label>
-              <select
-                id="timeframe"
-                value={timeframe}
-                onChange={(e) => setTimeframe(e.target.value)}
-                className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="1 week">1 week</option>
-                <option value="2 weeks">2 weeks</option>
-                <option value="1 month">1 month</option>
-                <option value="3 months">3 months</option>
-                <option value="6 months">6 months</option>
-              </select>
+              <div className="space-y-3">
+                <div className="px-1">
+                  <input
+                    type="range"
+                    id="timeframe-slider"
+                    min="0"
+                    max="100"
+                    value={sliderPosition}
+                    onChange={handleSliderChange}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    disabled={showCustomTimeframe}
+                    aria-label="Learning path timeframe slider"
+                    style={{
+                      background: `linear-gradient(to right, rgb(37, 99, 235) 0%, rgb(37, 99, 235) ${sliderPosition}%, rgb(55, 65, 81) ${sliderPosition}%, rgb(55, 65, 81) 100%)`
+                    }}
+                  />
+                  <div className="relative w-full h-6 mt-1">
+                    {sliderPresets.map((preset, index) => (
+                      <div 
+                        key={index} 
+                        className="absolute transform -translate-x-1/2" 
+                        style={{ left: `${preset.position}%` }}
+                      >
+                        <div className="w-0.5 h-1.5 bg-gray-400 mx-auto"></div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">{preset.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Current timeframe value */}
+                <div className="flex justify-between items-center">
+                  <div className="text-white text-lg font-medium">
+                    {showCustomTimeframe ? customTimeframe : getTimeframeFromDays(getCurrentDays())}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleCustomTimeframe}
+                    className="text-xs px-2 py-1 rounded bg-gray-700 text-blue-400 hover:bg-gray-600 flex items-center"
+                  >
+                    <RiEdit2Line className="mr-1" />
+                    {showCustomTimeframe ? "Use Slider" : "Custom"}
+                  </button>
+                </div>
+                
+                {/* Custom timeframe input */}
+                {showCustomTimeframe && (
+                  <div className="flex items-center mt-2">
+                    <input
+                      type="text"
+                      value={customTimeframe}
+                      onChange={handleCustomTimeframeChange}
+                      placeholder="E.g., 5 weeks, 7 months, etc."
+                      className="flex-1 p-3 bg-gray-800 rounded-lg border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="mb-6">
