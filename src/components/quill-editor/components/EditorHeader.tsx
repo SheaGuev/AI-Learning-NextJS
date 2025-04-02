@@ -7,18 +7,22 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../../ui/tooltip';
+import { Button } from '../../ui/button';
+import { FileDown } from 'lucide-react';
 import { Collaborator } from '../types';
 
 interface EditorHeaderProps {
   breadCrumbs?: string;
   collaborators: Collaborator[];
   saving: boolean;
+  onExportMarkdown?: () => void;
 }
 
 const EditorHeader: React.FC<EditorHeaderProps> = ({
   breadCrumbs,
   collaborators,
-  saving
+  saving,
+  onExportMarkdown
 }) => {
   return (
     <div
@@ -33,6 +37,24 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
     >
       <div>{breadCrumbs}</div>
       <div className="flex items-center gap-4">
+        {onExportMarkdown && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={onExportMarkdown}
+                  className="flex items-center gap-1"
+                >
+                  <FileDown size={16} />
+                  <span className="hidden sm:inline">Export Markdown</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export content as Markdown</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <div className="flex items-center justify-center h-10">
           {collaborators?.map((collaborator) => (
             <TooltipProvider key={collaborator.id}>

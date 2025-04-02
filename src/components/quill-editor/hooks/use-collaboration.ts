@@ -4,6 +4,7 @@ import { useSocket } from '@/lib/providers/socket-provider';
 import { findUser } from '@/supabase/queries';
 import { createBClient } from '@/lib/server-actions/createClient';
 import { Collaborator } from '../types';
+import { useToast } from '@/hooks/use-toast';
 
 export const useCollaboration = (quill: any, fileId: string) => {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -11,6 +12,8 @@ export const useCollaboration = (quill: any, fileId: string) => {
   const { socket, isConnected } = useSocket();
   const { user } = useSupabaseUser();
   const supabase = createBClient();
+  const { toast } = useToast();
+  const [previousCollaborators, setPreviousCollaborators] = useState<Collaborator[]>([]);
 
   // Set up socket room for collaboration
   useEffect(() => {
@@ -32,10 +35,20 @@ export const useCollaboration = (quill: any, fileId: string) => {
     
     socket.on('connect', handleSocketConnect);
     
+    // Receive confirmation of room join
+    socket.on('room-joined', (roomId: string) => {
+      console.log(`Successfully joined room: ${roomId}`);
+      toast({
+        title: "Collaboration active",
+        description: "You're now connected to the real-time collaboration server",
+      });
+    });
+    
     return () => {
       socket.off('connect', handleSocketConnect);
+      socket.off('room-joined');
     };
-  }, [socket, fileId]);
+  }, [socket, fileId, toast]);
   
   // Handle document changes from other users
   useEffect(() => {
@@ -73,6 +86,42 @@ export const useCollaboration = (quill: any, fileId: string) => {
           ).values()
         ) as Collaborator[];
         
+        // Check for new collaborators
+        if (previousCollaborators.length > 0) {
+          // Find users who just joined (in new list but not in previous list)
+          const newUsers = uniqueCollaborators.filter(
+            newUser => !previousCollaborators.some(prevUser => prevUser.id === newUser.id)
+          );
+          
+          // Find users who just left (in previous list but not in new list)
+          const leftUsers = previousCollaborators.filter(
+            prevUser => !uniqueCollaborators.some(newUser => newUser.id === prevUser.id)
+          );
+          
+          // Show notifications for join/leave events
+          newUsers.forEach(newUser => {
+            if (newUser.id !== user?.id) {
+              toast({
+                title: "Collaborator joined",
+                description: `${newUser.email} joined the document`,
+              });
+            }
+          });
+          
+          leftUsers.forEach(leftUser => {
+            if (leftUser.id !== user?.id) {
+              toast({
+                title: "Collaborator left",
+                description: `${leftUser.email} left the document`,
+              });
+            }
+          });
+        }
+        
+        // Update previous collaborators list for next comparison
+        setPreviousCollaborators(uniqueCollaborators);
+        
+        // Update the current collaborators state
         setCollaborators(uniqueCollaborators);
 
         if (user) {
@@ -121,10 +170,26 @@ export const useCollaboration = (quill: any, fileId: string) => {
       }
     };
     
+    // Setup cursor movement reception
+    const handleCursorMove = (range: any, cursorId: string) => {
+      if (cursorId !== user?.id) {
+        console.log(`Received cursor movement from ${cursorId}`);
+        const cursors = quill.getModule('cursors');
+        if (cursors) {
+          cursors.moveCursor(cursorId, range);
+        }
+      }
+    };
+    
+    // Add event listener for cursor movements
+    socket.on('receive-cursor-move', handleCursorMove);
+    
+    // Start tracking selection changes in the editor
     quill.on('selection-change', selectionChangeHandler);
     
     return () => {
       quill.off('selection-change', selectionChangeHandler);
+      socket.off('receive-cursor-move', handleCursorMove);
     };
   };
 

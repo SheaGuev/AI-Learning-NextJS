@@ -91,15 +91,36 @@ const SettingsForm = () => {
 //     setLoadingPortal(false);
 //   };
   //addcollborators
-//   const addCollaborator = async (profile: User) => {
-//     if (!workspaceId) return;
-//     if (subscription?.status !== 'active' && collaborators.length >= 2) {
-//       setOpen(true);
-//       return;
-//     }
-//     await addCollaborators([profile], workspaceId);
-//     setCollaborators([...collaborators, profile]);
-//   };
+  const addCollaborator = async (profile: User) => {
+    if (!workspaceId) {
+      toast({
+        title: "Error",
+        description: "Workspace ID is missing. Please try again after refreshing the page.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      // Add the collaborator to the database
+      await addCollaborators([profile], workspaceId);
+      
+      // Update the local state with the new collaborator
+      setCollaborators([...collaborators, profile]);
+      
+      toast({
+        title: "Success",
+        description: `Added ${profile.email} as a collaborator`,
+      });
+    } catch (error) {
+      console.error("Error adding collaborator:", error);
+      toast({
+        title: "Failed to add collaborator",
+        description: "An error occurred while adding the collaborator",
+        variant: "destructive"
+      });
+    }
+  };
 
   //remove collaborators
   const removeCollaborator = async (user: User) => {
@@ -116,38 +137,119 @@ const SettingsForm = () => {
 
   //on change
   const workspaceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!workspaceId || !e.target.value) return;
+    if (!workspaceId) {
+      console.error("Cannot update name: workspaceId is undefined");
+      toast({
+        title: "Error",
+        description: "Workspace ID is missing. Please try again after refreshing the page.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!e.target.value) return;
+    
+    // Update state immediately for responsive UI
     dispatch({
       type: 'UPDATE_WORKSPACE',
       payload: { workspace: { title: e.target.value }, workspaceId },
     });
+    
+    // Debounce the API call
     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
     titleTimerRef.current = setTimeout(async () => {
-      await updateWorkspace({ title: e.target.value }, workspaceId);
+      try {
+        console.log("Updating workspace name to:", e.target.value);
+        const result = await updateWorkspace({ title: e.target.value }, workspaceId);
+        
+        if (result?.error) {
+          console.error("Error updating workspace name:", result.error);
+          toast({
+            title: "Name Update Failed",
+            description: "Could not update the workspace name",
+            variant: "destructive"
+          });
+        } else {
+          console.log("Workspace name updated successfully");
+        }
+      } catch (err) {
+        console.error("Unexpected error updating workspace name:", err);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred",
+          variant: "destructive"
+        });
+      }
     }, 500);
   };
 
   const onChangeWorkspaceLogo = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    if (!workspaceId) return;
+    if (!workspaceId) {
+      console.error("Cannot upload logo: workspaceId is undefined");
+      toast({
+        title: "Error",
+        description: "Workspace ID is missing. Please try again after refreshing the page.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const file = e.target.files?.[0];
     if (!file) return;
+    
     const uuid = v4();
     setUploadingLogo(true);
-    const { data, error } = await supabase.storage
-      .from('workspace-logos')
-      .upload(`workspaceLogo.${uuid}`, file, {
-        cacheControl: '3600',
-        upsert: true,
-      });
+    
+    try {
+      console.log("Uploading to storage bucket:", file.name, file.size);
+      const { data, error } = await supabase.storage
+        .from('workspace-logos')
+        .upload(`workspaceLogo.${uuid}`, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
 
-    if (!error) {
+      if (error) {
+        console.error("Storage upload error:", error);
+        toast({
+          title: "Upload Failed",
+          description: error.message,
+          variant: "destructive"
+        });
+        setUploadingLogo(false);
+        return;
+      }
+
+      console.log("Upload successful, path:", data.path);
       dispatch({
         type: 'UPDATE_WORKSPACE',
         payload: { workspace: { logo: data.path }, workspaceId },
       });
-      await updateWorkspace({ logo: data.path }, workspaceId);
+      
+      const updateResult = await updateWorkspace({ logo: data.path }, workspaceId);
+      if (updateResult?.error) {
+        console.error("Database update error:", updateResult.error);
+        toast({
+          title: "Update Failed",
+          description: "Logo uploaded but couldn't update workspace record",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Workspace logo updated successfully",
+        });
+      }
+    } catch (err) {
+      console.error("Unexpected error during upload:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    } finally {
       setUploadingLogo(false);
     }
   };
@@ -175,6 +277,8 @@ const SettingsForm = () => {
       (workspace) => workspace.id === workspaceId
     );
     if (showingWorkspace) setWorkspaceDetails(showingWorkspace);
+    console.log("Current workspaceId:", workspaceId); // Debug workspaceId
+    console.log("Current workspaces:", state.workspaces); // Debug available workspaces
   }, [workspaceId, state]);
 
   useEffect(() => {
@@ -209,6 +313,7 @@ const SettingsForm = () => {
           placeholder="Workspace Name"
           onChange={workspaceNameChange}
         />
+        {/* Workspace Logo upload disabled temporarily
         <Label
           htmlFor="workspaceLogo"
           className="text-sm text-muted-foreground"
@@ -228,6 +333,7 @@ const SettingsForm = () => {
             To customize your workspace, you need to be on a Pro Plan
           </small>
         )}
+        */}
       </div>
       <>
         <Label htmlFor="permissions">Permissions</Label>
@@ -277,7 +383,7 @@ const SettingsForm = () => {
             <CollaboratorSearch
               existingCollaborators={collaborators}
               getCollaborator={(user) => {
-                // addCollaborator(user);
+                addCollaborator(user);
               }}
             >
               <Button

@@ -4,6 +4,7 @@ import { useAppState } from '@/lib/providers/state-provider';
 import { useRouter } from 'next/navigation';
 import { deleteFile, deleteFolder, updateFile, updateFolder, updateWorkspace } from '@/supabase/queries';
 import { createBClient } from '@/lib/server-actions/createClient';
+import { useSocket } from '@/lib/providers/socket-provider';
 
 export const useDocumentOperations = (quill: any, fileId: string, dirType: 'file' | 'folder' | 'workspace') => {
   const supabase = createBClient();
@@ -13,11 +14,18 @@ export const useDocumentOperations = (quill: any, fileId: string, dirType: 'file
   const [saving, setSaving] = useState(false);
   const [deletingBanner, setDeletingBanner] = useState(false);
   const { toast } = useToast();
+  const { socket, isConnected } = useSocket();
 
   // Document change handler with debounce save
   const quillHandler = useCallback((delta: any, oldDelta: any, source: any) => {
     if (source !== 'user') {
       return;
+    }
+      
+    // Emit changes to socket server for real-time collaboration
+    if (socket && isConnected && fileId) {
+      console.log('Emitting changes to socket server for room:', fileId);
+      socket.emit('send-changes', delta, fileId);
     }
       
     // Clear any existing save timer
@@ -253,6 +261,217 @@ export const useDocumentOperations = (quill: any, fileId: string, dirType: 'file
     setDeletingBanner(false);
   };
 
+  // Get content as markdown
+  const getMarkdownContent = useCallback(async () => {
+    if (!quill) {
+      toast({
+        title: 'Error',
+        variant: 'destructive',
+        description: 'Editor not initialized',
+      });
+      return null;
+    }
+    
+    try {
+      // Use turndown to convert HTML to markdown
+      const html = quill.root.innerHTML;
+      
+      // Dynamically import turndown to avoid server-side issues
+      const TurndownService = (await import('turndown')).default;
+      const turndownService = new TurndownService({
+        headingStyle: 'atx',
+        codeBlockStyle: 'fenced',
+        bulletListMarker: '*'
+      });
+      
+      const markdown = turndownService.turndown(html);
+      
+      toast({
+        title: 'Success',
+        description: 'Markdown content exported',
+      });
+      
+      return markdown;
+    } catch (err) {
+      console.error('Error converting to markdown:', err);
+      toast({
+        title: 'Error',
+        variant: 'destructive',
+        description: 'Failed to get markdown content',
+      });
+      return null;
+    }
+  }, [quill, toast]);
+
+  // Import markdown content 
+  const importMarkdown = useCallback((markdown: string) => {
+    if (!quill) {
+      toast({
+        title: 'Error',
+        variant: 'destructive',
+        description: 'Editor not initialized',
+      });
+      return;
+    }
+    
+    try {
+      // Don't just set text, but convert markdown to HTML and then set as content
+      // This approach will properly convert markdown to rich text format
+      
+      const convertMarkdownToQuillContent = async () => {
+        try {
+          // First, clear the editor
+          quill.setText('');
+          
+          // Process the markdown line by line for better control
+          const lines = markdown.split('\n');
+          let currentIndex = 0;
+          
+          for (const line of lines) {
+            // Skip empty lines but add them to the editor
+            if (!line.trim()) {
+              quill.insertText(currentIndex, '\n');
+              currentIndex += 1;
+              continue;
+            }
+            
+            // Process headings
+            if (line.startsWith('# ')) {
+              const content = line.substring(2);
+              quill.insertText(currentIndex, content + '\n', { header: 1 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            if (line.startsWith('## ')) {
+              const content = line.substring(3);
+              quill.insertText(currentIndex, content + '\n', { header: 2 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            if (line.startsWith('### ')) {
+              const content = line.substring(4);
+              quill.insertText(currentIndex, content + '\n', { header: 3 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            if (line.startsWith('#### ')) {
+              const content = line.substring(5);
+              quill.insertText(currentIndex, content + '\n', { header: 4 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process bullet lists
+            if (line.startsWith('* ') || line.startsWith('- ')) {
+              const content = line.substring(2);
+              quill.insertText(currentIndex, content + '\n', { list: 'bullet' });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process numbered lists
+            const numberedListMatch = line.match(/^\d+\.\s(.+)$/);
+            if (numberedListMatch) {
+              const content = numberedListMatch[1];
+              quill.insertText(currentIndex, content + '\n', { list: 'ordered' });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process blockquotes
+            if (line.startsWith('> ')) {
+              const content = line.substring(2);
+              quill.insertText(currentIndex, content + '\n', { blockquote: true });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process bold text (standalone line)
+            if (line.startsWith('**') && line.endsWith('**') && line.length > 4) {
+              const content = line.substring(2, line.length - 2);
+              quill.insertText(currentIndex, content + '\n', { bold: true });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process italic text (standalone line)
+            if ((line.startsWith('*') && line.endsWith('*') && line.length > 2) ||
+                (line.startsWith('_') && line.endsWith('_') && line.length > 2)) {
+              const content = line.startsWith('*') ? 
+                line.substring(1, line.length - 1) : 
+                line.substring(1, line.length - 1);
+              quill.insertText(currentIndex, content + '\n', { italic: true });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process code blocks
+            if (line.startsWith('```')) {
+              // Start of code block
+              quill.insertText(currentIndex, '\n', { 'code-block': true });
+              currentIndex += 1;
+              continue;
+            }
+            
+            // Process inline code (simple version)
+            if (line.startsWith('`') && line.endsWith('`') && line.length > 2) {
+              const content = line.substring(1, line.length - 1);
+              quill.insertText(currentIndex, content + '\n', { 'code': true });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process indented code blocks
+            if (line.startsWith('    ') || line.startsWith('\t')) {
+              const content = line.startsWith('    ') ? line.substring(4) : line.substring(1);
+              quill.insertText(currentIndex, content + '\n', { 'code-block': true });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Horizontal rule
+            if (line === '---' || line === '***' || line === '___') {
+              quill.insertEmbed(currentIndex, 'hr', true);
+              quill.insertText(currentIndex + 1, '\n');
+              currentIndex += 2;
+              continue;
+            }
+            
+            // Try to process inline formatting (basic implementation)
+            let processedLine = line;
+            
+            // Default - insert as regular paragraph
+            quill.insertText(currentIndex, processedLine + '\n');
+            currentIndex += processedLine.length + 1;
+          }
+        } catch (err) {
+          console.error('Error converting markdown to rich text:', err);
+          // Fallback to plain text if conversion fails
+          quill.setText(markdown);
+        }
+      };
+      
+      convertMarkdownToQuillContent();
+      
+      toast({
+        title: 'Success',
+        description: 'Markdown content imported and converted',
+      });
+    } catch (err) {
+      toast({
+        title: 'Error',
+        variant: 'destructive',
+        description: 'Failed to import markdown content',
+      });
+      
+      // Fallback to plain text
+      quill.setText(markdown);
+    }
+  }, [quill, toast]);
+
   return {
     saving,
     deletingBanner,
@@ -260,6 +479,8 @@ export const useDocumentOperations = (quill: any, fileId: string, dirType: 'file
     restoreFileHandler,
     deleteFileHandler,
     iconOnChange,
-    deleteBanner
+    deleteBanner,
+    getMarkdownContent,
+    importMarkdown
   };
 }; 

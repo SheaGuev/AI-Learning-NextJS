@@ -10,6 +10,64 @@
   }
 }
 
+/* AI Command specific styles with highest specificity */
+body .ql-slash-commands .ql-slash-command-item.ai-command {
+  background: linear-gradient(135deg, #4c1d95, #2e1065) !important;
+  border-radius: 6px !important;
+  margin: 4px !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 2px 10px rgba(76, 29, 149, 0.4) !important;
+  border-left: 3px solid #6d28d9 !important;
+  position: relative !important;
+  padding-left: 15px !important;
+  border: none !important;
+  overflow: visible !important;
+}
+
+body .ql-slash-commands .ql-slash-command-item.ai-command::after {
+  content: none !important;
+}
+
+body .ql-slash-commands .ql-slash-command-item.ai-command:hover,
+body .ql-slash-commands .ql-slash-command-item.ai-command.selected {
+  background: linear-gradient(135deg, #5b21b6, #3b0086) !important;
+  box-shadow: 0 2px 12px rgba(91, 33, 182, 0.6) !important;
+  transform: scale(1.05) !important;
+}
+
+body .ql-slash-commands .ql-slash-command-item.ai-command::before {
+  content: none !important;
+}
+
+body .ql-slash-commands .ql-slash-command-item.ai-command .ql-slash-command-icon {
+  background-color: transparent !important;
+  margin-right: 12px !important;
+  margin-left: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+body .ql-slash-commands .ql-slash-command-item.ai-command .ql-slash-command-icon svg {
+  stroke: white !important;
+  filter: none !important;
+}
+
+body .ql-slash-commands .ql-slash-command-item.ai-command .ql-slash-command-label {
+  color: white !important;
+  font-weight: 600 !important;
+  text-shadow: none !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+body .ql-slash-commands .ql-slash-command-item.ai-command .ql-slash-command-description {
+  color: rgba(255, 255, 255, 0.8) !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
 .ql-slash-commands {
   position: fixed;
   z-index: 2000;
@@ -100,4 +158,24 @@
 
 .ql-editor:focus-within + .ql-slash-commands:not(.hidden) {
   outline: 3px solid #4b89ff !important;
+}
+
+/* Improve the selected item styling */
+.ql-slash-command-item.selected {
+  background-color: #333333;
+  border-left: 3px solid #8b5cf6;
+  position: relative;
+  z-index: 1;
+}
+
+/* Add a distinct selection indicator */
+.ql-slash-command-item.selected::after {
+  content: "→";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8b5cf6;
+  font-weight: bold;
+  font-size: 16px;
 } 

@@ -299,11 +299,20 @@ const AppStateProvider: React.FC<AppStateProviderProps> = ({ children }) => {
 
   const workspaceId = useMemo(() => {
     const urlSegments = pathname?.split('/').filter(Boolean);
-    if (urlSegments)
-      if (urlSegments.length > 1) {
+    if (urlSegments) {
+      // Check for dashboard path followed by workspaceid
+      if (urlSegments.length > 0 && urlSegments[0] === 'dashboard' && urlSegments.length > 1) {
+        console.log("Found workspaceId in URL:", urlSegments[1]);
         return urlSegments[1];
       }
-  }, [pathname]);
+    }
+    // If no workspace in URL, try to get from state
+    if (state.workspaces.length > 0) {
+      console.log("Falling back to first workspace in state:", state.workspaces[0].id);
+      return state.workspaces[0].id;
+    }
+    return undefined;
+  }, [pathname, state.workspaces]);
 
   const folderId = useMemo(() => {
     const urlSegments = pathname?.split('/').filter(Boolean);

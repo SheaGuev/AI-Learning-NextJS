@@ -1,0 +1,16 @@
+[33mcommit cdc0bcbc9817ab7c1e1338620054f1c5a19b7e77[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mDevelopment[m[33m, [m[1;31morigin/Development[m[33m, [m[1;32mMain-Dev[m[33m)[m
+Author: Shea Patrick Sexton <128555572+SheaGuev@users.noreply.github.com>
+Date:   Wed Apr 2 19:03:24 2025 +0100
+
+    Enhance dashboard setup and AI tutor functionality with emoji picker updates, API key management, and improved file content handling. Added new hooks for Gemini API integration and refined UI components for better user experience.
+
+M	src/components/dashboard-setup/dashboard-setup.tsx
+M	src/components/dashboard-tools/ai-tutor/ai-tutor.tsx
+M	src/components/global/emoji-picker.tsx
+M	src/components/global/tooltip-wrapper.tsx
+M	src/components/quill-editor/components/DocumentTitle.tsx
+M	src/components/quill-editor/hooks/use-editor-setup.ts
+M	src/components/quill-editor/quill-editor.tsx
+M	src/components/sidebar/Dropdown.tsx
+M	src/components/sidebar/folders-dropdown-list.tsx
+A	src/lib/hooks/useGemini.ts

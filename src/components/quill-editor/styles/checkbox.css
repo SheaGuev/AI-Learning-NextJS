@@ -1,0 +1,31 @@
+/* Checkbox styling for Quill editor */
+
+.ql-checkbox {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  margin-right: 4px;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.ql-checkbox-input {
+  margin: 0 4px 0 0;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.ql-checkbox-text {
+  display: inline;
+  white-space: normal;
+  vertical-align: middle;
+  margin-left: 4px;
+  cursor: text;
+}
+
+/* Style for completed tasks */
+.ql-checkbox input:checked + .ql-checkbox-text {
+  text-decoration: line-through;
+  color: #888;
+} 

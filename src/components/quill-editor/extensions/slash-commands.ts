@@ -364,13 +364,21 @@ export default class SlashCommands {
       commandCount: commandOptions.length,
       commands: commandOptions.map((cmd: CommandOption) => ({
         label: cmd.label,
-        hasHandler: !!cmd.handler
+        hasHandler: !!cmd.handler,
+        className: cmd.className
       }))
     });
     
     commandOptions.forEach((command: any, index: number) => {
       const item = document.createElement('div');
       item.className = 'ql-slash-command-item';
+      
+      // Add custom class if provided
+      if (command.className) {
+        console.log(`Adding custom class ${command.className} to command ${command.label}`);
+        item.classList.add(command.className);
+      }
+      
       item.dataset.command = command.label.toLowerCase().replace(/\s+/g, '-');
       
       // Add icon if available
@@ -652,5 +660,6 @@ interface CommandOption {
   label: string;
   icon?: string;
   description?: string;
+  className?: string;
   handler: (quill: any, range: any) => void;
 } 

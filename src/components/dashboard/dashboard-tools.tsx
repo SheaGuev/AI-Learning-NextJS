@@ -2,10 +2,13 @@
 
 import React, { useState } from 'react';
 import AiTutor from '@/components/dashboard-tools/ai-tutor/ai-tutor';
-import { RiRobot2Line, RiCodeLine, RiFileTextLine, RiSettings4Line } from 'react-icons/ri';
+import FlashcardQuizGenerator from '@/components/dashboard-tools/flashcard-quiz/flashcard-quiz-generator';
+import LearningPathPlanner from '@/components/dashboard-tools/learning-path/learning-path-planner';
+import ResearchTool from '@/components/dashboard-tools/research/research-tool';
+import { RiRobot2Line, RiCodeLine, RiRoadMapLine, RiSearchLine } from 'react-icons/ri';
 
 // Tool types
-type ToolType = 'ai-tutor' | 'code-editor' | 'notes' | 'settings' | null;
+type ToolType = 'ai-tutor' | 'flashcard-quiz' | 'learning-path' | 'research' | null;
 
 interface ToolCardProps {
   title: string;
@@ -42,22 +45,22 @@ const DashboardTools: React.FC = () => {
       icon: <RiRobot2Line />,
     },
     {
-      id: 'code-editor',
-      title: 'Code Editor',
-      description: 'Write and edit code with syntax highlighting',
+      id: 'flashcard-quiz',
+      title: 'Flashcards & Quiz',
+      description: 'Generate study materials from your files',
       icon: <RiCodeLine />,
     },
     {
-      id: 'notes',
-      title: 'Notes',
-      description: 'Take and manage learning notes',
-      icon: <RiFileTextLine />,
+      id: 'learning-path',
+      title: 'Learning Path Planner',
+      description: 'Chart your learning journey',
+      icon: <RiRoadMapLine />,
     },
     {
-      id: 'settings',
-      title: 'Settings',
-      description: 'Configure your workspace settings',
-      icon: <RiSettings4Line />,
+      id: 'research',
+      title: 'Research Tool',
+      description: 'Find relevant sources and references',
+      icon: <RiSearchLine />,
     }
   ];
 
@@ -65,12 +68,12 @@ const DashboardTools: React.FC = () => {
     switch(activeTool) {
       case 'ai-tutor':
         return <AiTutor />;
-      case 'code-editor':
-        return <div className="bg-gray-900 p-4 rounded-lg text-white h-[400px]">Code Editor (Coming Soon)</div>;
-      case 'notes':
-        return <div className="bg-gray-900 p-4 rounded-lg text-white h-[400px]">Notes (Coming Soon)</div>;
-      case 'settings':
-        return <div className="bg-gray-900 p-4 rounded-lg text-white h-[400px]">Settings (Coming Soon)</div>;
+      case 'flashcard-quiz':
+        return <FlashcardQuizGenerator />;
+      case 'learning-path':
+        return <LearningPathPlanner />;
+      case 'research':
+        return <ResearchTool />;
       default:
         return null;
     }
@@ -92,7 +95,7 @@ const DashboardTools: React.FC = () => {
       </div>
       
       {activeTool && (
-        <div className="mt-4 transition-all">
+        <div className="mt-4 transition-all min-h-[600px]">
           {renderActiveTool()}
         </div>
       )}
