@@ -42,7 +42,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-
 export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url);
   const code = requestUrl.searchParams.get('code');
@@ -52,26 +51,47 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No code provided' }, { status: 400 });
   }
 
+  // Create a standard Supabase client
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        detectSessionInUrl: true,
         flowType: 'pkce',
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        persistSession: true,
       },
     }
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  // Exchange the code for a session
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     console.error('Error exchanging code for session:', error);
-    // Return a JSON response with error details rather than returning a bare error object
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Redirect to the login page with an error message
+    return NextResponse.redirect(`${requestUrl.origin}/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  // const route_url = process.env.NEXT_PUBLIC_SITE_URL
-  // Successful confirmation: redirect to dashboard
-  return NextResponse.redirect(`${requestUrl.origin}/dashboard`);
+  if (!data.session) {
+    console.error('No session data returned from code exchange');
+    return NextResponse.redirect(`${requestUrl.origin}/login?error=${encodeURIComponent('Authentication failed')}`);
+  }
+
+  // Log success
+  console.log('Session established successfully for user:', data.session.user.id);
+  
+  // Create response with redirect
+  const response = NextResponse.redirect(`${requestUrl.origin}/dashboard`);
+  
+  // Set auth cookie manually to ensure it's available on client
+  response.cookies.set('supabase-auth-token', JSON.stringify([data.session.access_token, data.session.refresh_token]), {
+    maxAge: 60 * 60 * 24 * 7, // 1 week
+    path: '/',
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+
+  return response;
 }
