@@ -1,9 +1,6 @@
 import Link from 'next/link';
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
-// import CypressHomeIcon from '../icons/cypressHomeIcon';
-// import CypressSettingsIcon from '../icons/cypressSettingsIcon';
-// import CypressTrashIcon from '../icons/cypressTrashIcon';
 import Settings from '../settings/settings';
 import Trash from '../trash/trash';
 
@@ -29,14 +26,15 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
             className="group/native
             flex
             items-center
-            text-Neutrals/neutrals-7
+            text-Neutrals/neutrals-9
+            hover:text-Neutrals/neutrals-3
             transition-all
-            gap-2
+            gap-3
           "
             href={`/dashboard/${myWorkspaceId}`}
           >
-            <FiHome className="h-5 w-5" />
-            <span>Dashboard</span>
+            <FiHome className="h-6 w-6" />
+            <span className="text-lg">Dashboard</span>
           </Link>
         </li>
 
@@ -45,14 +43,15 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
             className="group/native
             flex
             items-center
-            text-Neutrals/neutrals-7
+            text-Neutrals/neutrals-9
+            hover:text-Neutrals/neutrals-3
             transition-all
-            gap-2
+            gap-3
             cursor-pointer
           "
           >
-            <FiSettings className="h-5 w-5" />
-            <span>Settings</span>
+            <FiSettings className="h-6 w-6" />
+            <span className="text-lg">Settings</span>
           </li>
         </Settings>
 
@@ -61,13 +60,14 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
             className="group/native
             flex
             items-center
-            text-Neutrals/neutrals-7
+            text-Neutrals/neutrals-9
+            hover:text-Neutrals/neutrals-3
             transition-all
-            gap-2
+            gap-3
           "
           >
-            <FiTrash2 className="h-5 w-5" />
-            <span>Trash</span>
+            <FiTrash2 className="h-6 w-6" />
+            <span className="text-lg">Trash</span>
           </li>
         </Trash>
       </ul>

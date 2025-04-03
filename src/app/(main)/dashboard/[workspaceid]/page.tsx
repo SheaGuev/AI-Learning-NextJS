@@ -13,7 +13,7 @@ const Workspace = async ({ params }: { params: Params }) => {
     // if (error || !data.length) redirect('/dashboard');
 
   return (
-    <div className="p-6 bg-gray-950 min-h-screen text-white">
+    <div className="p-6 bg-gradient-to-br from-black via-black to-indigo-950 min-h-screen text-white">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
         <DashboardTools />

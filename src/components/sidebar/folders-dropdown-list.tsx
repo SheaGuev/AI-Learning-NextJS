@@ -99,20 +99,21 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
         sticky 
         z-20 
         top-0 
-        bg-background 
+        bg-black 
         w-full  
         h-10 
         group/title 
         justify-between 
         items-center 
         pr-4 
+        pl-1
         text-Neutrals/neutrals-8
   "
       >
         <span
           className="text-Neutrals-8 
         font-bold 
-        text-xs"
+        text-sm"
         >
           FOLDERS
         </span>
@@ -120,7 +121,7 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
           <span className="inline-flex">
             <PlusIcon
               onClick={addFolderHandler}
-              size={18}
+              size={22}
               className="group-hover/title:inline-block
               hidden 
               cursor-pointer

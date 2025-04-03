@@ -54,7 +54,7 @@ const FileTree: React.FC<{
       {items.map((item) => (
         <li key={item.id} className="py-1">
           <div 
-            className="flex items-center hover:bg-gray-700 rounded px-1 py-0.5 cursor-pointer text-sm"
+            className="flex items-center hover:bg-[#2d2d3a] rounded px-1 py-0.5 cursor-pointer text-sm"
             onClick={() => item.type === 'folder' ? toggleFolder(item.id) : toggleFileSelection(item)}
           >
             <div className="mr-1.5" style={{ marginLeft: `${level * 4}px` }}>
@@ -63,17 +63,19 @@ const FileTree: React.FC<{
               ) : (
                 <div className="w-4 h-4 flex justify-center items-center">
                   {selectedFiles[item.id] ? 
-                    <FiCheckSquare className="text-blue-500" /> : 
+                    <FiCheckSquare className="text-[#8B5CF6]" /> : 
                     <FiSquare className="text-gray-400" />
                   }
                 </div>
               )}
             </div>
-            {item.type === 'folder' ? (
-              <FiFolder className="mr-1.5 text-yellow-500" />
-            ) : (
-              <FiFile className="mr-1.5 text-blue-400" />
-            )}
+            <div className="flex items-center min-w-[20px]">
+              {item.type === 'folder' ? (
+                <FiFolder className="mr-1.5 text-[#8B5CF6]" />
+              ) : (
+                <FiFile className="mr-1.5 text-[#8B5CF6]" />
+              )}
+            </div>
             <span className="text-gray-300 truncate">{item.title}</span>
           </div>
           
@@ -100,20 +102,20 @@ const FlashcardComponent: React.FC<{
 }> = ({ flashcard, toggleFlip }) => {
   return (
     <div 
-      className={`w-full bg-gray-800 rounded-lg shadow-md cursor-pointer transform transition-transform hover:scale-105 mb-4`}
+      className={`w-full bg-[#282a36] rounded-lg shadow-md cursor-pointer transform transition-transform hover:scale-105 mb-4`}
       style={{ height: '220px' }}
       onClick={() => toggleFlip(flashcard.id)}
     >
       <div className="h-full flex items-center justify-center p-4">
         <div className="w-full h-full relative">
           <div 
-            className={`absolute inset-0 backface-visibility-hidden bg-gray-800 border border-gray-700 rounded-lg flex flex-col justify-center items-center p-4 text-center transition-opacity duration-200 ${flashcard.flipped ? 'opacity-0' : 'opacity-100'}`}
+            className={`absolute inset-0 backface-visibility-hidden bg-[#282a36] border border-[#44475a] rounded-lg flex flex-col justify-center items-center p-4 text-center transition-opacity duration-200 ${flashcard.flipped ? 'opacity-0' : 'opacity-100'}`}
           >
             <h3 className="text-white font-medium text-lg">{flashcard.question}</h3>
             <div className="mt-2 text-sm text-gray-400">Click to reveal answer</div>
           </div>
           <div 
-            className={`absolute inset-0 backface-visibility-hidden bg-indigo-800 border border-indigo-700 rounded-lg flex flex-col justify-center items-center p-6 text-center transition-opacity duration-200 ${flashcard.flipped ? 'opacity-100' : 'opacity-0'}`}
+            className={`absolute inset-0 backface-visibility-hidden bg-[#1a1b26] border border-[#44475a] rounded-lg flex flex-col justify-center items-center p-6 text-center transition-opacity duration-200 ${flashcard.flipped ? 'opacity-100' : 'opacity-0'}`}
           >
             <p className="text-white text-lg">{flashcard.answer}</p>
           </div>
@@ -129,7 +131,7 @@ const QuizComponent: React.FC<{
   onAnswer: (questionId: string, answerIndex: number) => void;
 }> = ({ question, onAnswer }) => {
   return (
-    <div className="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
+    <div className="mb-6 bg-[#282a36] p-4 rounded-lg">
       <h3 className="text-white font-medium mb-3">{question.question}</h3>
       <div className="space-y-2">
         {question.options.map((option, index) => {
@@ -140,11 +142,11 @@ const QuizComponent: React.FC<{
           return (
             <div 
               key={index}
-              className={`p-3 rounded-md border cursor-pointer transition-colors
-                ${isSelected ? 'border-blue-500' : 'border-gray-600'} 
-                ${isCorrect ? 'bg-green-800 border-green-500' : ''}
-                ${isWrong ? 'bg-red-800 border-red-500' : ''}
-                ${question.userAnswerIndex === null ? 'hover:bg-gray-700' : ''}`}
+              className={`p-3 rounded-md transition-colors
+                ${isSelected ? 'bg-[#3d3d4d] border border-[#7c3aed]' : 'bg-[#2d2d3a]'} 
+                ${isCorrect ? 'bg-green-800 border border-green-500' : ''}
+                ${isWrong ? 'bg-red-800 border border-red-500' : ''}
+                ${question.userAnswerIndex === null ? 'hover:bg-[#3d3d4d] cursor-pointer' : ''}`}
               onClick={() => question.userAnswerIndex === null && onAnswer(question.id, index)}
             >
               <p className="text-white">{option}</p>
@@ -404,163 +406,216 @@ const FlashcardQuizGenerator: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-[400px] h-full w-full max-w-6xl bg-gray-900 rounded-lg shadow-lg border border-gray-700">
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
-        <div className="p-3 border-b border-gray-700 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-white">
-            {contentType === 'flashcards' ? 'Flashcard Generator' : 'Quiz Generator'}
-          </h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setContentType('flashcards')}
-              className={`px-3 py-1 text-sm rounded ${contentType === 'flashcards' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-            >
-              Flashcards
-            </button>
-            <button
-              onClick={() => setContentType('quiz')}
-              className={`px-3 py-1 text-sm rounded ${contentType === 'quiz' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-            >
-              Quiz
-            </button>
-            <button
-              onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-              className="text-xs text-blue-400 hover:text-blue-300"
-            >
-              {showApiKeyInput ? 'Hide API Key' : 'Set API Key'}
-            </button>
+    <div className="bg-[#1e1e2e] border border-[#4A4A67] rounded-lg p-5 shadow-lg">
+      <div className="flex flex-col space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* File Browser */}
+          <div className="lg:col-span-1 bg-[#282a36] rounded-lg p-4 max-h-[600px] overflow-auto">
+            <h3 className="text-[#8B5CF6] font-semibold mb-3 flex items-center">
+              <FiFolder className="mr-2" /> Files
+              <span className="ml-auto text-sm text-gray-400">
+                {selectedCount} selected
+              </span>
+            </h3>
+            {isLoadingFiles ? (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#8B5CF6]"></div>
+              </div>
+            ) : fileStructure.length > 0 ? (
+              <FileTree 
+                items={fileStructure}
+                level={0}
+                expandedFolders={expandedFolders}
+                toggleFolder={toggleFolder}
+                selectedFiles={selectedFiles}
+                toggleFileSelection={toggleFileSelection}
+              />
+            ) : (
+              <p className="text-gray-400 text-sm italic">No files found in this workspace</p>
+            )}
+          </div>
+
+          {/* Generator & Results */}
+          <div className="lg:col-span-3 flex flex-col bg-[#282a36] rounded-lg overflow-hidden">
+            {/* Generator Controls */}
+            <div className="p-4 border-b border-[#44475a]">
+              <div className="flex flex-wrap gap-4 mb-4">
+                <button
+                  onClick={() => setContentType('flashcards')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    contentType === 'flashcards' 
+                      ? 'bg-[#8B5CF6] text-white' 
+                      : 'bg-[#2d2d3a] text-gray-300 hover:bg-[#3d3d4d]'
+                  }`}
+                >
+                  Flashcards
+                </button>
+                <button
+                  onClick={() => setContentType('quiz')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    contentType === 'quiz' 
+                      ? 'bg-[#8B5CF6] text-white' 
+                      : 'bg-[#2d2d3a] text-gray-300 hover:bg-[#3d3d4d]'
+                  }`}
+                >
+                  Quiz
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Topic (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder={`Topic for ${contentType === 'flashcards' ? 'flashcards' : 'quiz questions'}`}
+                    className="w-full bg-[#1a1b26] text-white p-3 rounded-lg focus:outline-none focus:border-[#8B5CF6]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    {contentType === 'flashcards' ? 'Number of flashcards' : 'Number of questions'}
+                  </label>
+                  <div className="flex items-center">
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      value={count}
+                      onChange={(e) => setCount(parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-[#44475a] rounded-lg appearance-none cursor-pointer"
+                      title={`Number of ${contentType === 'flashcards' ? 'flashcards' : 'questions'} to generate`}
+                    />
+                    <span className="ml-3 text-white font-medium w-8 text-center">{count}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={handleGenerate}
+                    disabled={isLoading || selectedCount === 0}
+                    className="w-full flex items-center justify-center py-3 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin h-5 w-5 border-2 border-t-transparent border-white rounded-full mr-2"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FiRefreshCw className="mr-2" />
+                        Generate {contentType === 'flashcards' ? 'Flashcards' : 'Quiz'}
+                      </>
+                    )}
+                  </button>
+                  {!apiKey && (
+                    <button
+                      onClick={() => setShowApiKeyInput(true)}
+                      className="mt-2 w-full text-xs text-[#8B5CF6] hover:text-[#A78BFA]"
+                    >
+                      Set API key for generation
+                    </button>
+                  )}
+                  {selectedCount === 0 && (
+                    <p className="text-yellow-400 text-xs mt-2">
+                      Please select at least one file to provide context
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Content Display */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {contentType === 'flashcards' ? (
+                flashcards.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                    {flashcards.map((card) => (
+                      <FlashcardComponent 
+                        key={card.id} 
+                        flashcard={card} 
+                        toggleFlip={toggleFlashcard} 
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                    <div className="bg-[#2d2d3a] p-5 rounded-xl mb-4">
+                      <FiPlus className="text-[#8B5CF6] mx-auto text-4xl mb-2" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Create Flashcards</h3>
+                    <p className="text-gray-400 max-w-md">
+                      Select files from your workspace, then generate flashcards to help you memorize key concepts.
+                    </p>
+                  </div>
+                )
+              ) : (
+                quiz.length > 0 ? (
+                  <div>
+                    {quiz.map((question) => (
+                      <QuizComponent 
+                        key={question.id} 
+                        question={question} 
+                        onAnswer={handleQuizAnswer} 
+                      />
+                    ))}
+                    <div className="mt-4 p-4 bg-[#2d2d3a] rounded-lg">
+                      <h3 className="text-white font-medium mb-2">Score</h3>
+                      <div className="text-2xl font-bold text-[#8B5CF6]">
+                        {quiz.filter(q => q.userAnswerIndex === q.correctAnswerIndex).length} / {quiz.length}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                    <div className="bg-[#2d2d3a] p-5 rounded-xl mb-4">
+                      <FiPlus className="text-[#8B5CF6] mx-auto text-4xl mb-2" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Create Quiz</h3>
+                    <p className="text-gray-400 max-w-md">
+                      Select files from your workspace, then generate quiz questions to test your knowledge.
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
           </div>
         </div>
-        
+
+        {/* API Key Modal */}
         {showApiKeyInput && (
-          <div className="p-3 border-b border-gray-700 bg-gray-800">
-            <div className="flex gap-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#282a36] rounded-lg max-w-md w-full p-6">
+              <h3 className="text-[#8B5CF6] font-semibold mb-4">Enter your Google Gemini API key</h3>
               <input
-                type="password"
+                type="text"
                 value={apiKey}
                 onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder="Enter your Gemini API key"
-                className="flex-1 p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white placeholder-gray-400"
+                placeholder="API Key"
+                className="w-full bg-[#1a1b26] text-white p-3 rounded-lg focus:outline-none focus:border-[#8B5CF6] mb-4"
               />
-              <button
-                onClick={handleSaveApiKey}
-                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-              >
-                Save
-              </button>
-            </div>
-            <div className="mt-1 text-xs text-gray-400">
-              Get your API key at: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">aistudio.google.com/app/apikey</a>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowApiKeyInput(false)}
+                  className="px-4 py-2 rounded-lg text-gray-300 hover:bg-[#2d2d3a]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveApiKey}
+                  className="px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#7C3AED] text-white"
+                  disabled={!apiKey.trim()}
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         )}
-        
-        <div className="p-3 border-b border-gray-700 bg-gray-800">
-          <div className="flex flex-wrap gap-2 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-300 mb-1">Topic</label>
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder={contentType === 'flashcards' ? "e.g., React Hooks" : "e.g., JavaScript Promises"}
-                className="w-full p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white placeholder-gray-400 border border-gray-700"
-              />
-            </div>
-            <div className="w-20">
-              <label className="block text-sm font-medium text-gray-300 mb-1">Count</label>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={count}
-                onChange={(e) => setCount(parseInt(e.target.value) || 5)}
-                aria-label="Number of items to generate"
-                className="w-full p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white border border-gray-700"
-              />
-            </div>
-            <button
-              onClick={handleGenerate}
-              disabled={isLoading || selectedCount === 0}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 flex items-center"
-            >
-              {isLoading ? <FiRefreshCw className="animate-spin" /> : <FiPlus />}
-              <span className="ml-1">Generate</span>
-            </button>
-          </div>
-          {selectedCount === 0 && (
-            <div className="mt-2 text-xs text-yellow-500">Please select at least one file from the sidebar</div>
-          )}
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-900">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-pulse text-gray-300 flex items-center">
-                <FiRefreshCw className="animate-spin mr-2" />
-                Generating...
-              </div>
-            </div>
-          ) : contentType === 'flashcards' ? (
-            flashcards.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {flashcards.map(card => (
-                  <FlashcardComponent 
-                    key={card.id} 
-                    flashcard={card} 
-                    toggleFlip={toggleFlashcard} 
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                <p>No flashcards yet. Generate some!</p>
-              </div>
-            )
-          ) : (
-            quiz.length > 0 ? (
-              <div className="space-y-4">
-                {quiz.map(question => (
-                  <QuizComponent 
-                    key={question.id} 
-                    question={question} 
-                    onAnswer={handleQuizAnswer} 
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                <p>No quiz questions yet. Generate some!</p>
-              </div>
-            )
-          )}
-        </div>
-      </div>
-      
-      {/* File Browser Side Panel */}
-      <div className="w-64 border-l border-gray-700 flex flex-col">
-        <div className="p-3 border-b border-gray-700">
-          <h3 className="text-sm font-semibold text-white">Files ({selectedCount} selected)</h3>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 text-sm">
-          <div className="text-gray-400 text-xs mb-2 px-2">Not in Trash</div>
-          
-          {isLoadingFiles ? (
-            <div className="text-gray-400 text-center p-4">Loading files...</div>
-          ) : fileStructure.length === 0 ? (
-            <div className="text-gray-400 text-center p-4">No files found</div>
-          ) : (
-            <FileTree 
-              items={fileStructure} 
-              level={0} 
-              expandedFolders={expandedFolders}
-              toggleFolder={toggleFolder}
-              selectedFiles={selectedFiles}
-              toggleFileSelection={toggleFileSelection}
-            />
-          )}
-        </div>
       </div>
     </div>
   );

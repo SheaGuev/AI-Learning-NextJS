@@ -47,7 +47,7 @@ const FileTree: React.FC<{
       {items.map((item) => (
         <li key={item.id} className="py-1">
           <div 
-            className="flex items-center hover:bg-gray-700 rounded px-1 py-0.5 cursor-pointer text-sm"
+            className="flex items-center hover:bg-[#2d2d3a] rounded px-1 py-0.5 cursor-pointer text-sm"
             onClick={() => item.type === 'folder' ? toggleFolder(item.id) : toggleFileSelection(item)}
           >
             <div className="mr-1.5" style={{ marginLeft: `${level * 4}px` }}>
@@ -56,17 +56,19 @@ const FileTree: React.FC<{
               ) : (
                 <div className="w-4 h-4 flex justify-center items-center">
                   {selectedFiles[item.id] ? 
-                    <FiCheckSquare className="text-blue-500" /> : 
+                    <FiCheckSquare className="text-[#8B5CF6]" /> : 
                     <FiSquare className="text-gray-400" />
                   }
                 </div>
               )}
             </div>
-            {item.type === 'folder' ? (
-              <FiFolder className="mr-1.5 text-yellow-500" />
-            ) : (
-              <FiFile className="mr-1.5 text-blue-400" />
-            )}
+            <div className="flex items-center min-w-[20px]">
+              {item.type === 'folder' ? (
+                <FiFolder className="mr-1.5 text-[#8B5CF6]" />
+              ) : (
+                <FiFile className="mr-1.5 text-[#8B5CF6]" />
+              )}
+            </div>
             <span className="text-gray-300 truncate">{item.title}</span>
           </div>
           
@@ -349,118 +351,142 @@ const AiTutor: React.FC = () => {
   };
 
   return (
-    <div className="flex h-[400px] w-full max-w-6xl bg-gray-900 rounded-lg shadow-lg border border-gray-700">
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
-        <div className="p-3 border-b border-gray-700 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-white">AI Tutor</h2>
-          <button
-            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-            className="text-xs text-blue-400 hover:text-blue-300"
-          >
-            {showApiKeyInput ? 'Hide API Key' : 'Set API Key'}
-          </button>
-        </div>
-        
-        {showApiKeyInput && (
-          <div className="p-3 border-b border-gray-700 bg-gray-800">
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder="Enter your Gemini API key"
-                className="flex-1 p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white placeholder-gray-400"
-              />
+    <div className="bg-[#1e1e2e] border border-[#4A4A67] rounded-lg p-5 shadow-lg">
+      <div className="flex flex-col h-full space-y-4">
+        {!showApiKeyInput ? (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              {/* File Browser */}
+              <div className="lg:col-span-1 bg-[#282a36] rounded-lg p-4 max-h-[600px] overflow-auto">
+                <h3 className="text-[#8B5CF6] font-semibold mb-3 flex items-center">
+                  <FiFolder className="mr-2" /> Files
+                  <span className="ml-auto text-sm text-gray-400">
+                    {selectedCount} selected
+                  </span>
+                </h3>
+                {isLoadingFiles ? (
+                  <div className="flex justify-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#8B5CF6]"></div>
+                  </div>
+                ) : fileStructure.length > 0 ? (
+                  <FileTree 
+                    items={fileStructure}
+                    level={0}
+                    expandedFolders={expandedFolders}
+                    toggleFolder={toggleFolder}
+                    selectedFiles={selectedFiles}
+                    toggleFileSelection={toggleFileSelection}
+                  />
+                ) : (
+                  <p className="text-gray-400 text-sm italic">No files found in this workspace</p>
+                )}
+              </div>
+
+              {/* Chat Area */}
+              <div className="lg:col-span-3 flex flex-col h-[600px] bg-[#282a36] rounded-lg overflow-hidden">
+                {/* Messages Container */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                      <div className="bg-[#2d2d3a] p-5 rounded-xl mb-4">
+                        <FiSquare className="text-[#8B5CF6] mx-auto text-4xl mb-2" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-white mb-2">AI Tutor Assistant</h3>
+                      <p className="text-gray-400 max-w-md">
+                        Select files from your workspace to provide context, then ask questions to get personalized learning assistance.
+                      </p>
+                    </div>
+                  ) : (
+                    messages.map((message, index) => (
+                      <div 
+                        key={index}
+                        className={`${
+                          message.role === 'user' 
+                            ? 'bg-[#2d2d3a] ml-8' 
+                            : 'bg-[#1a1b26] ml-0 mr-8'
+                        } p-4 rounded-lg`}
+                      >
+                        <div className="flex items-center mb-2">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            message.role === 'user' ? 'bg-[#7C3AED]' : 'bg-[#8B5CF6]'
+                          }`}>
+                            {message.role === 'user' ? 'U' : 'AI'}
+                          </div>
+                          <span className="ml-2 text-sm font-medium text-gray-300">
+                            {message.role === 'user' ? 'You' : 'AI Tutor'}
+                          </span>
+                        </div>
+                        {message.role === 'assistant' ? (
+                          <MarkdownRenderer content={message.content} />
+                        ) : (
+                          <p className="text-gray-300">{message.content}</p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                  {isLoading && (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#8B5CF6]"></div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Input Area */}
+                <div className="border-t border-[#44475a] p-4">
+                  <form onSubmit={handleSubmit} className="flex items-center">
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      placeholder="Ask your learning question..."
+                      className="flex-1 bg-[#1a1b26] text-white p-3 rounded-l-lg focus:outline-none focus:border-[#8B5CF6]"
+                      disabled={isLoading || isGenerating || selectedCount === 0}
+                    />
+                    <button
+                      type="submit"
+                      title="Send message"
+                      className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white p-3 rounded-r-lg flex items-center"
+                      disabled={!input.trim() || isLoading || isGenerating || selectedCount === 0}
+                    >
+                      <FiSend />
+                    </button>
+                  </form>
+                  {selectedCount === 0 && (
+                    <p className="text-yellow-400 text-xs mt-2">
+                      Please select at least one file to provide context
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="bg-[#282a36] rounded-lg p-6 max-w-md mx-auto">
+            <h3 className="text-[#8B5CF6] font-semibold mb-4">Enter your Google Gemini API key</h3>
+            <input
+              type="text"
+              value={apiKey}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder="API Key"
+              className="w-full bg-[#1a1b26] text-white p-3 rounded-lg focus:outline-none focus:border-[#8B5CF6] mb-4"
+            />
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowApiKeyInput(false)}
+                className="px-4 py-2 rounded-lg text-gray-300 hover:bg-[#2d2d3a]"
+              >
+                Cancel
+              </button>
               <button
                 onClick={handleSaveApiKey}
-                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                className="px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#7C3AED] text-white"
+                disabled={!apiKey.trim()}
               >
                 Save
               </button>
             </div>
-            <div className="mt-1 text-xs text-gray-400">
-              Get your API key at: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">aistudio.google.com/app/apikey</a>
-            </div>
           </div>
         )}
-        
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-900">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              <div
-                className={`max-w-[80%] rounded-lg p-2.5 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-100'
-                }`}
-              >
-                {message.role === 'user' ? (
-                  message.content
-                ) : (
-                  <MarkdownRenderer content={message.content} />
-                )}
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-800 rounded-lg p-2.5">
-                <div className="animate-pulse text-gray-300">Thinking...</div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-3 border-t border-gray-700">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={selectedCount > 0 ? "Ask about the selected files..." : "Ask about your code..."}
-              className="flex-1 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400 border border-gray-700"
-            />
-            <button
-              title="Send"
-              type="submit"
-              disabled={isLoading}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
-            >
-              <FiSend />
-            </button>
-          </div>
-        </form>
-      </div>
-      
-      {/* File Browser Side Panel */}
-      <div className="w-64 border-l border-gray-700 flex flex-col">
-        <div className="p-3 border-b border-gray-700">
-          <h3 className="text-sm font-semibold text-white">Files ({selectedCount} selected)</h3>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 text-sm">
-          <div className="text-gray-400 text-xs mb-2 px-2">Not in Trash</div>
-          
-          {isLoadingFiles ? (
-            <div className="text-gray-400 text-center p-4">Loading files...</div>
-          ) : fileStructure.length === 0 ? (
-            <div className="text-gray-400 text-center p-4">No files found</div>
-          ) : (
-            <FileTree 
-              items={fileStructure} 
-              level={0} 
-              expandedFolders={expandedFolders}
-              toggleFolder={toggleFolder}
-              selectedFiles={selectedFiles}
-              toggleFileSelection={toggleFileSelection}
-            />
-          )}
-        </div>
       </div>
     </div>
   );

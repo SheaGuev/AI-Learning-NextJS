@@ -499,8 +499,8 @@ const Dropdown: React.FC<DropdownProps> = ({
   const listStyles = useMemo(
     () =>
       clsx('relative', {
-        'border-none text-md': isFolder,
-        'border-none ml-6 text-[16px] py-1': !isFolder,
+        'border-none text-base pl-1': isFolder,
+        'border-none ml-4 text-base py-1': !isFolder,
       }),
     [isFolder]
   );
@@ -677,9 +677,10 @@ const Dropdown: React.FC<DropdownProps> = ({
       <AccordionTrigger
         id={listType}
         className="hover:no-underline 
-        p-2 
+        px-1 
+        py-2 
         dark:text-muted-foreground 
-        text-sm"
+        text-base"
         disabled={false}
         onFocus={() => listType === 'folder' && setIsAccordionOpen(true)}
         onClick={async (e) => {
@@ -703,14 +704,14 @@ const Dropdown: React.FC<DropdownProps> = ({
           <div className="flex gap-2 items-center">
             {!isEditing ? (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2 text-base">
                   <EmojiPicker getValue={onChangeEmoji}>
-                    <span className="w-[24px] h-[24px] flex items-center justify-center">
+                    <span className="w-[32px] h-[32px] flex items-center justify-center text-xl">
                       {iconId}
                     </span>
                   </EmojiPicker>
                   <span 
-                    className="text-sm cursor-pointer"
+                    className="text-base cursor-pointer"
                     onDoubleClick={handleDoubleClick}
                   >
                     {folderTitle || fileTitle}
@@ -720,7 +721,7 @@ const Dropdown: React.FC<DropdownProps> = ({
             ) : (
               <div className="flex items-center gap-2">
                 <EmojiPicker getValue={onChangeEmoji}>
-                  <span className="w-[24px] h-[24px] flex items-center justify-center">
+                  <span className="w-[32px] h-[32px] flex items-center justify-center text-xl">
                     {iconId}
                   </span>
                 </EmojiPicker>
@@ -741,7 +742,7 @@ const Dropdown: React.FC<DropdownProps> = ({
                     }
                   }}
                   autoFocus
-                  className="bg-transparent text-sm border-none focus:outline-none"
+                  className="bg-transparent text-base border-none focus:outline-none"
                   aria-label={`Edit ${listType} title`}
                 />
               </div>
@@ -783,7 +784,7 @@ const Dropdown: React.FC<DropdownProps> = ({
                 }}
               >
                 <Trash
-                  size={15}
+                  size={18}
                   className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
                 />
               </span>
@@ -806,7 +807,7 @@ const Dropdown: React.FC<DropdownProps> = ({
                   }}
                 >
                   <PlusIcon
-                    size={15}
+                    size={18}
                     className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
                   />
                 </span>

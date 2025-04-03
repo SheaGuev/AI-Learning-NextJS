@@ -50,7 +50,7 @@ await Promise.all([
 
 
     return (
-    <aside className={twMerge("scrollbar-hide bg-zinc-950 overflow-hidden !justify-between sm:flex sm:flex-col w-[280px] shrink-0 p-4 md:gap-4" , className)}>
+    <aside className={twMerge("scrollbar-hide bg-black overflow-hidden !justify-between sm:flex sm:flex-col w-[280px] shrink-0 p-4 md:gap-4" , className)}>
 
     <div className="px-1">
         <WorkspaceDropdown
@@ -77,9 +77,10 @@ await Promise.all([
                   bottom-0 
                   h-20 
                   bg-gradient-to-t 
-                  from-background 
+                  from-black 
                   to-transparent 
-                  z-40"
+                  z-40
+                  "
                   />
                   <FoldersDropdownList
                     workspaceFolders={workspaceFolderData || []}

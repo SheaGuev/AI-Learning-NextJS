@@ -1213,377 +1213,291 @@ Return ONLY valid JSON with no explanations.`;
   };
 
   return (
-    <div className="flex flex-col h-full min-h-[600px] bg-gray-900 rounded-lg overflow-hidden">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-white flex items-center">
-          <RiRoadMapLine className="mr-2 text-blue-500" /> Learning Path Planner
-        </h2>
-        <div className="flex items-center space-x-3">
-          {learningPlan && !isLoading && (
-            <button
-              onClick={saveToWorkspace}
-              disabled={isSavingToWorkspace}
-              className="flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSavingToWorkspace ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <RiFileAddLine className="mr-1.5" />
-                  Add to Workspace
-                </>
-              )}
-            </button>
-          )}
-          <button
-            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-            className="text-xs text-blue-400 hover:text-blue-300"
+    <div className="bg-[#1e1e2e] border border-[#6d28d9] rounded-lg p-5 shadow-lg">
+      <div className="flex flex-col space-y-4">
+        {/* Content Uploader Section */}
+        {/* <div className="flex flex-wrap gap-4 pb-4 border-b border-[#44475a]"> */}
+          {/* <button 
+            onClick={() => setShowTextPasteModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#282a36] text-white rounded-lg hover:bg-[#2d2d3a]"
           >
-            {showApiKeyInput ? 'Hide API Key' : 'Set API Key'}
+            <RiFileAddLine className="text-[#7c3aed]" /> Paste Content
           </button>
-        </div>
-      </div>
-      
-      {showApiKeyInput && (
-        <div className="p-3 border-b border-gray-700 bg-gray-800">
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder="Enter your Gemini API key"
-              className="flex-1 p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white placeholder-gray-400"
-            />
-            <button
-              onClick={handleSaveApiKey}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-            >
-              Save
-            </button>
-          </div>
-          <div className="mt-1 text-xs text-gray-400">
-            Get your API key at: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">aistudio.google.com/app/apikey</a>
-          </div>
-        </div>
-      )}
-      
-      {(isLoading || isFileUploading) && (
-        <div className="p-6 flex flex-col items-center justify-center">
-          <div className="animate-spin w-8 h-8 rounded-full border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p className="text-gray-300 text-sm">
-            {pdfProcessingState === 'extracting' ? "Extracting text from PDF..." :
-             pdfProcessingState === 'generating' ? "AI is generating plan from PDF text..." :
-             isFileUploading ? "Processing uploaded file..." :
-             isLoading && rawResponse ? "AI is repairing JSON format..." :
-             isLoading ? "Generating learning path..." : "Loading..."
-            }
-          </p>
-        </div>
-      )}
-      
-      {showRawResponse && rawResponse && (
-        <div className="p-3 border-b border-gray-700 bg-gray-800">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-semibold text-white">Raw AI Response (for debugging)</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={manuallyRepairJson}
-                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                disabled={isLoading}
-              >
-                {isLoading ? "Repairing..." : "Attempt Repair"}
-              </button>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(rawResponse);
-                  toast({
-                    title: 'Copied',
-                    description: 'Raw response copied to clipboard',
-                  });
-                }}
-                className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-              >
-                Copy to Clipboard
-              </button>
-              <button
-                onClick={() => setShowRawResponse(false)}
-                className="px-2 py-1 bg-gray-700 text-white rounded text-xs hover:bg-gray-600"
-              >
-                Hide
-              </button>
-            </div>
-          </div>
-          <div className="bg-gray-900 p-3 rounded border border-gray-700 text-gray-300 text-xs overflow-auto max-h-[200px]">
-            <pre>{rawResponse}</pre>
-          </div>
-          <div className="mt-2 text-xs text-yellow-500">
-            The AI response couldn't be parsed as valid JSON. Click "Attempt Repair" to try fixing it automatically, or copy to fix it manually, or try generating again.
-          </div>
-        </div>
-      )}
-      
-      <div className="flex-1 overflow-y-auto p-4">
-        {!learningPlan && !isLoading && !isFileUploading && (
-          <form onSubmit={handleGenerateLearningPath} className="max-w-2xl mx-auto">
-            <div className="mb-4">
-              <label htmlFor="goal" className="block text-sm font-medium text-gray-300 mb-1">
-                What do you want to learn?
-              </label>
-              <input
-                type="text"
-                id="goal"
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                placeholder="E.g., Python for beginners, React fundamentals, World History..."
-                className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="timeframe" className="block text-sm font-medium text-gray-300 mb-1">
-                Available timeframe
-              </label>
-              <div className="space-y-3">
-                <div className="px-1">
-                  <input
-                    type="range"
-                    id="timeframe-slider"
-                    min="0"
-                    max="100"
-                    value={sliderPosition}
-                    onChange={handleSliderChange}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    disabled={showCustomTimeframe}
-                    aria-label="Learning path timeframe slider"
-                    style={{
-                      background: `linear-gradient(to right, rgb(37, 99, 235) 0%, rgb(37, 99, 235) ${sliderPosition}%, rgb(55, 65, 81) ${sliderPosition}%, rgb(55, 65, 81) 100%)`
-                    }}
-                  />
-                  <div className="relative w-full h-6 mt-1">
-                    {sliderPresets.map((preset, index) => (
-                      <div 
-                        key={index} 
-                        className="absolute transform -translate-x-1/2" 
-                        style={{ left: `${preset.position}%` }}
-                      >
-                        <div className="w-0.5 h-1.5 bg-gray-400 mx-auto"></div>
-                        <span className="text-xs text-gray-400 whitespace-nowrap">{preset.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Current timeframe value */}
-                <div className="flex justify-between items-center">
-                  <div className="text-white text-lg font-medium">
-                    {showCustomTimeframe ? customTimeframe : getTimeframeFromDays(getCurrentDays())}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={toggleCustomTimeframe}
-                    className="text-xs px-2 py-1 rounded bg-gray-700 text-blue-400 hover:bg-gray-600 flex items-center"
-                  >
-                    <RiEdit2Line className="mr-1" />
-                    {showCustomTimeframe ? "Use Slider" : "Custom"}
-                  </button>
-                </div>
-                
-                {/* Custom timeframe input */}
-                {showCustomTimeframe && (
-                  <div className="flex items-center mt-2">
-                    <input
-                      type="text"
-                      value={customTimeframe}
-                      onChange={handleCustomTimeframeChange}
-                      placeholder="E.g., 5 weeks, 7 months, etc."
-                      className="flex-1 p-3 bg-gray-800 rounded-lg border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="mb-6">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="includeSchedule"
-                  checked={includeSchedule}
-                  onChange={(e) => setIncludeSchedule(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded"
-                />
-                <label htmlFor="includeSchedule" className="ml-2 text-sm font-medium text-gray-300">
-                  Include a suggested study schedule
-                </label>
-              </div>
-            </div>
-            
-            <button
-              type="submit"
-              disabled={isLoading || !goal.trim()}
-              className="w-full flex items-center justify-center p-3 mb-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <RiSendPlane2Line className="mr-2" />
-                  Generate Learning Path
-                </>
-              )}
-            </button>
-
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <div className="w-full border-t border-gray-700"></div>
-              </div>
-              <div className="relative flex justify-center">
-                <span className="px-2 bg-gray-900 text-sm text-gray-400">Or</span>
-              </div>
-            </div>
-
-            <label
-              htmlFor="plan-upload"
-              className={`w-full flex items-center justify-center p-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 cursor-pointer ${isFileUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {isFileUploading ? (
-                <>
-                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {pdfProcessingState === 'extracting' ? 'Extracting PDF...' : 'Uploading...'}
-                </>
-              ) : (
-                <>
-                  <RiUploadCloud2Line className="mr-2" />
-                  Upload Existing Plan (.txt, .md, .pdf)
-                </>
-              )}
-            </label>
-            <input
-              id="plan-upload"
-              type="file"
-              className="hidden"
-              accept=".txt,.md,.pdf"
+          
+          <label className="flex items-center gap-2 px-4 py-2 bg-[#282a36] text-white rounded-lg hover:bg-[#2d2d3a] cursor-pointer">
+            <RiUploadCloud2Line className="text-[#7c3aed]" /> Upload PDF
+            <input 
+              type="file" 
+              accept=".pdf"
               onChange={handleFileUpload}
-              disabled={isFileUploading}
+              className="hidden"
             />
-
-          </form>
-        )}
-        
-        {learningPlan && !isLoading && !isFileUploading && (
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white mb-2">{learningPlan.title}</h2>
+          </label> */}
+          
+          {pdfProcessingState === 'extracting' && (
+            <div className="flex items-center gap-2 text-yellow-400">
+              <div className="animate-spin h-4 w-4 border-2 border-t-transparent border-yellow-400 rounded-full"></div>
+              Extracting text from PDF...
+            </div>
+          )}
+          {pdfProcessingState === 'generating' && (
+            <div className="flex items-center gap-2 text-[#7c3aed]">
+              <div className="animate-spin h-4 w-4 border-2 border-t-transparent border-[#7c3aed] rounded-full"></div>
+              Generating learning path from PDF...
+            </div>
+          )}
+        </div>
+        {/* Form and data display section */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {!learningPlan && !isLoading && !isFileUploading && (
+            <form onSubmit={handleGenerateLearningPath} className="max-w-2xl mx-auto">
+              <div className="mb-4">
+                <label htmlFor="goal" className="block text-sm font-medium text-gray-300 mb-1">
+                  What do you want to learn?
+                </label>
+                <input
+                  type="text"
+                  id="goal"
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
+                  placeholder="E.g., Python for beginners, React fundamentals, World History..."
+                  className="w-full p-3 bg-[#1a1b26] text-white rounded-lg focus:outline-none focus:border-[#7c3aed]"
+                  required
+                />
               </div>
-              <p className="text-gray-300">{learningPlan.description}</p>
-            </div>
-            
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold text-white mb-3">Learning Modules</h3>
-              {learningPlan.modules.map((module, index) => (
-                <ModuleCard key={index} module={module} index={index} />
-              ))}
-            </div>
-            
-            {learningPlan.schedule && (
-              <ScheduleCard schedule={learningPlan.schedule} />
-            )}
-            
-            <div className="flex justify-center mt-6 space-x-4">
+              
+              <div className="mb-4">
+                <label htmlFor="timeframe" className="block text-sm font-medium text-gray-300 mb-1">
+                  Available timeframe
+                </label>
+                <div className="space-y-3">
+                  <div className="px-1">
+                    <input
+                      type="range"
+                      id="timeframe-slider"
+                      min="0"
+                      max="100"
+                      value={sliderPosition}
+                      onChange={handleSliderChange}
+                      className="w-full h-2 bg-[#44475a] rounded-lg appearance-none cursor-pointer"
+                      disabled={showCustomTimeframe}
+                      aria-label="Learning path timeframe slider"
+                      style={{
+                        background: `linear-gradient(to right, #7c3aed 0%, #7c3aed ${sliderPosition}%, #44475a ${sliderPosition}%, #44475a 100%)`
+                      }}
+                    />
+                    <div className="relative w-full h-6 mt-1">
+                      {sliderPresets.map((preset, index) => (
+                        <div 
+                          key={index} 
+                          className="absolute transform -translate-x-1/2" 
+                          style={{ left: `${preset.position}%` }}
+                        >
+                          <div className="w-0.5 h-1.5 bg-gray-400 mx-auto"></div>
+                          <span className="text-xs text-gray-400 whitespace-nowrap">{preset.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Current timeframe value */}
+                  <div className="flex justify-between items-center">
+                    <div className="text-white text-lg font-medium">
+                      {showCustomTimeframe ? customTimeframe : getTimeframeFromDays(getCurrentDays())}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleCustomTimeframe}
+                      className="text-xs px-2 py-1 rounded bg-[#282a36] text-[#7c3aed] hover:bg-[#2d2d3a] flex items-center"
+                    >
+                      <RiEdit2Line className="mr-1" />
+                      {showCustomTimeframe ? "Use Slider" : "Custom"}
+                    </button>
+                  </div>
+                  
+                  {/* Custom timeframe input */}
+                  {showCustomTimeframe && (
+                    <div className="flex items-center mt-2">
+                      <input
+                        type="text"
+                        value={customTimeframe}
+                        onChange={handleCustomTimeframeChange}
+                        placeholder="E.g., 5 weeks, 7 months, etc."
+                        className="flex-1 p-3 bg-[#1a1b26] text-white rounded-lg focus:outline-none focus:border-[#7c3aed]"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="includeSchedule"
+                    checked={includeSchedule}
+                    onChange={(e) => setIncludeSchedule(e.target.checked)}
+                    className="w-4 h-4 text-[#7c3aed] focus:ring-[#7c3aed] border-gray-600 rounded"
+                  />
+                  <label htmlFor="includeSchedule" className="ml-2 text-sm font-medium text-gray-300">
+                    Include a suggested study schedule
+                  </label>
+                </div>
+              </div>
+              
               <button
-                onClick={() => setLearningPlan(null)}
-                className="px-4 py-2 text-sm text-blue-400 hover:text-blue-300"
+                type="submit"
+                disabled={isLoading || !goal.trim()}
+                className="w-full flex items-center justify-center p-3 mb-4 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create or Upload New Plan
-              </button>
-              <button
-                onClick={saveToWorkspace}
-                disabled={isSavingToWorkspace}
-                className="flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSavingToWorkspace ? (
+                {isLoading ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
+                    <div className="animate-spin h-5 w-5 border-2 border-t-transparent border-white rounded-full mr-2"></div>
+                    Generating...
                   </>
                 ) : (
                   <>
-                    <RiFileAddLine className="mr-1.5" />
-                    Add to Workspace
+                    <RiSendPlane2Line className="mr-2" />
+                    Generate Learning Path
                   </>
                 )}
               </button>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-[#44475a]"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="px-2 bg-[#1a1b26] text-sm text-gray-400">Or</span>
+                </div>
+              </div>
+
+              <label
+                htmlFor="plan-upload"
+                className={`w-full flex items-center justify-center p-3 bg-[#282a36] text-white rounded-lg hover:bg-[#2d2d3a] cursor-pointer ${isFileUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {isFileUploading ? (
+                  <>
+                    <div className="animate-spin h-5 w-5 border-2 border-t-transparent border-white rounded-full mr-2"></div>
+                    {pdfProcessingState === 'extracting' ? 'Extracting PDF...' : 'Uploading...'}
+                  </>
+                ) : (
+                  <>
+                    <RiUploadCloud2Line className="mr-2" />
+                    Upload Existing Plan (.txt, .md, .pdf)
+                  </>
+                )}
+              </label>
+              <input
+                id="plan-upload"
+                type="file"
+                className="hidden"
+                accept=".txt,.md,.pdf"
+                onChange={handleFileUpload}
+                disabled={isFileUploading}
+              />
+            </form>
+          )}
+          
+          {learningPlan && !isLoading && !isFileUploading && (
+            <div className="max-w-4xl mx-auto">
+              <div className="mb-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-white mb-2">{learningPlan.title}</h2>
+                </div>
+                <p className="text-gray-300">{learningPlan.description}</p>
+              </div>
+              
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-white mb-3">Learning Modules</h3>
+                {learningPlan.modules.map((module, index) => (
+                  <ModuleCard key={index} module={module} index={index} />
+                ))}
+              </div>
+              
+              {learningPlan.schedule && (
+                <ScheduleCard schedule={learningPlan.schedule} />
+              )}
+              
+              <div className="flex justify-center mt-6 space-x-4">
+                <button
+                  onClick={() => setLearningPlan(null)}
+                  className="px-4 py-2 text-sm text-blue-400 hover:text-blue-300"
+                >
+                  Create or Upload New Plan
+                </button>
+                <button
+                  onClick={saveToWorkspace}
+                  disabled={isSavingToWorkspace}
+                  className="flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingToWorkspace ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <RiFileAddLine className="mr-1.5" />
+                      Add to Workspace
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Text Paste Modal */}
+        {showTextPasteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-white">Paste Text Content</h3>
+                <button 
+                  onClick={() => setShowTextPasteModal(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  &times;
+                </button>
+              </div>
+              
+              <form onSubmit={handlePastedTextSubmit} className="p-4 flex-1 flex flex-col">
+                <p className="text-gray-300 mb-4">
+                  PDF processing failed. You can paste the text content from your document directly:
+                </p>
+                
+                <textarea 
+                  value={pastedText}
+                  onChange={(e) => setPastedText(e.target.value)}
+                  placeholder="Paste your text here..."
+                  className="w-full flex-1 min-h-[200px] p-3 bg-gray-700 rounded-lg border border-gray-600 text-white resize-none mb-4"
+                />
+                
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowTextPasteModal(false)}
+                    className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Process Text
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
       </div>
-
-      {/* Text Paste Modal */}
-      {showTextPasteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-white">Paste Text Content</h3>
-              <button 
-                onClick={() => setShowTextPasteModal(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                &times;
-              </button>
-            </div>
-            
-            <form onSubmit={handlePastedTextSubmit} className="p-4 flex-1 flex flex-col">
-              <p className="text-gray-300 mb-4">
-                PDF processing failed. You can paste the text content from your document directly:
-              </p>
-              
-              <textarea 
-                value={pastedText}
-                onChange={(e) => setPastedText(e.target.value)}
-                placeholder="Paste your text here..."
-                className="w-full flex-1 min-h-[200px] p-3 bg-gray-700 rounded-lg border border-gray-600 text-white resize-none mb-4"
-              />
-              
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowTextPasteModal(false)}
-                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Process Text
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+    // </div>
   );
 };
 
