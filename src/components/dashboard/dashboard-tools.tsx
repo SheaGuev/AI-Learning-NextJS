@@ -22,11 +22,11 @@ const ToolCard: React.FC<ToolCardProps> = ({ title, description, icon, onClick, 
   return (
     <div 
       className={`bg-[#1e1e2e] border p-5 rounded-lg shadow-md cursor-pointer transition-all hover:bg-[#2d2d3a] 
-        ${isActive ? 'border-[#8B5CF6] ring-2 ring-[#8B5CF6]/20' : 'border-[#4A4A67]'}`}
+        ${isActive ? 'border-[#6052A8] ring-2 ring-[#6052A8]/30' : 'border-[#4A4A67]'}`}
       onClick={onClick}
     >
       <div className="flex items-center mb-3">
-        <div className="text-[#8B5CF6] text-2xl mr-3">{icon}</div>
+        <div className="text-[#6052A8] text-2xl mr-3">{icon}</div>
         <h3 className="text-lg font-semibold text-white">{title}</h3>
       </div>
       <p className="text-gray-300 text-sm">{description}</p>

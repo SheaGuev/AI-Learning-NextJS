@@ -56,7 +56,7 @@ const FileTree: React.FC<{
               ) : (
                 <div className="w-4 h-4 flex justify-center items-center">
                   {selectedFiles[item.id] ? 
-                    <FiCheckSquare className="text-[#8B5CF6]" /> : 
+                    <FiCheckSquare className="text-[#6052A8]" /> : 
                     <FiSquare className="text-gray-400" />
                   }
                 </div>
@@ -64,9 +64,9 @@ const FileTree: React.FC<{
             </div>
             <div className="flex items-center min-w-[20px]">
               {item.type === 'folder' ? (
-                <FiFolder className="mr-1.5 text-[#8B5CF6]" />
+                <FiFolder className="mr-1.5 text-[#6052A8]" />
               ) : (
-                <FiFile className="mr-1.5 text-[#8B5CF6]" />
+                <FiFile className="mr-1.5 text-[#6052A8]" />
               )}
             </div>
             <span className="text-gray-300 truncate">{item.title}</span>

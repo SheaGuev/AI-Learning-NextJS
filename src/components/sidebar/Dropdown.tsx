@@ -488,32 +488,15 @@ const Dropdown: React.FC<DropdownProps> = ({
   };
 
   const isFolder = listType === 'folder';
-  const groupIdentifies = clsx(
-    'dark:text-white whitespace-nowrap flex justify-between items-center w-full relative',
-    {
-      'group/folder': isFolder,
-      'group/file': !isFolder,
-    }
-  );
+  // Simplify classes
+  const actionButtonStyles = "flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white z-10";
 
   const listStyles = useMemo(
     () =>
-      clsx('relative', {
-        'border-none text-base pl-1': isFolder,
-        'border-none ml-4 text-base py-1': !isFolder,
+      clsx('relative overflow-visible', {
+        'border-none text-base pl-1 pr-3': isFolder,
+        'border-none ml-4 text-base py-1 pr-3': !isFolder,
       }),
-    [isFolder]
-  );
-
-  const hoverStyles = useMemo(
-    () =>
-      clsx(
-        'h-full flex rounded-sm absolute right-0 items-center justify-center',
-        {
-          'opacity-0 group-hover/file:opacity-100': listType === 'file',
-          'hidden group-hover/folder:flex': listType === 'folder',
-        }
-      ),
     [isFolder]
   );
 
@@ -678,9 +661,9 @@ const Dropdown: React.FC<DropdownProps> = ({
         id={listType}
         className="hover:no-underline 
         px-1 
-        py-2 
+        py-1
         dark:text-muted-foreground 
-        text-base"
+        text-sm"
         disabled={false}
         onFocus={() => listType === 'folder' && setIsAccordionOpen(true)}
         onClick={async (e) => {
@@ -700,118 +683,71 @@ const Dropdown: React.FC<DropdownProps> = ({
         }}
         showArrow={listType === 'folder'}
       >
-        <div className={groupIdentifies}>
-          <div className="flex gap-2 items-center">
+        <div className="flex w-full justify-between items-center group">
+          <div className="flex items-center gap-2 max-w-[220px] truncate">
+            <EmojiPicker getValue={onChangeEmoji}>
+              <span className={`flex items-center justify-center flex-shrink-0 ${listType === 'folder' ? 'w-[26px] h-[26px] text-lg' : 'w-[18px] h-[18px] text-sm'}`}>
+                {iconId}
+              </span>
+            </EmojiPicker>
+            
             {!isEditing ? (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 text-base">
-                  <EmojiPicker getValue={onChangeEmoji}>
-                    <span className="w-[32px] h-[32px] flex items-center justify-center text-xl">
-                      {iconId}
-                    </span>
-                  </EmojiPicker>
-                  <span 
-                    className="text-base cursor-pointer"
-                    onDoubleClick={handleDoubleClick}
-                  >
-                    {folderTitle || fileTitle}
-                  </span>
-                </div>
-              </div>
+              <span 
+                className="text-base cursor-pointer truncate"
+                onDoubleClick={handleDoubleClick}
+              >
+                {folderTitle || fileTitle}
+              </span>
             ) : (
-              <div className="flex items-center gap-2">
-                <EmojiPicker getValue={onChangeEmoji}>
-                  <span className="w-[32px] h-[32px] flex items-center justify-center text-xl">
-                    {iconId}
-                  </span>
-                </EmojiPicker>
-                <input
-                  type="text"
-                  value={folderTitle || fileTitle}
-                  onChange={(e) => {
-                    if (listType === 'folder') {
-                      folderTitleChange(e);
-                    } else {
-                      fileTitleChange(e);
-                    }
-                  }}
-                  onBlur={handleBlur}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleBlur();
-                    }
-                  }}
-                  autoFocus
-                  className="bg-transparent text-base border-none focus:outline-none"
-                  aria-label={`Edit ${listType} title`}
-                />
-              </div>
-            )}
-          </div>
-          <div className={hoverStyles}>
-            <TooltipWrapper tooltip="Delete">
-              <span
-                className="p-1 hover:bg-slate-600 rounded-full transition-colors inline-flex"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (listType === 'file') {
-                    const pathId = id.split('folder')[1];
-                    if (pathId) {
-                      try {
-                        console.log('🔍 Moving file to trash:', { pathId });
-                        moveToTrash(e);
-                      } catch (err) {
-                        console.error('🔍 Exception in file trash operation:', err);
-                        toast({
-                          title: 'Error',
-                          variant: 'destructive',
-                          description: 'An unexpected error occurred',
-                        });
-                      }
-                    } else {
-                      console.error('🔍 Invalid file ID format:', { pathId, id });
-                      toast({
-                        title: 'Error',
-                        variant: 'destructive',
-                        description: 'Could not identify file to delete',
-                      });
-                    }
+              <input
+                type="text"
+                value={folderTitle || fileTitle}
+                onChange={(e) => {
+                  if (listType === 'folder') {
+                    folderTitleChange(e);
                   } else {
-                    // Folder deletion logic - use existing moveToTrash function
-                    console.log('🔍 Deleting folder:', { id });
-                    moveToTrash(e);
+                    fileTitleChange(e);
                   }
                 }}
-              >
-                <Trash
-                  size={18}
-                  className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
-                />
-              </span>
-            </TooltipWrapper>
+                onBlur={handleBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleBlur();
+                  }
+                }}
+                autoFocus
+                className="bg-transparent text-base border-none focus:outline-none w-full"
+                aria-label={`Edit ${listType} title`}
+              />
+            )}
+          </div>
+
+          {/* Action buttons with smooth fade-in animation */}
+          <div className="flex items-center gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out ml-1">
+            <button
+              type="button"
+              className="flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                moveToTrash(e);
+              }}
+              title="Delete"
+            >
+              <Trash size={14} />
+            </button>
+            
             {listType === 'folder' && !isEditing && (
-              <TooltipWrapper tooltip="Add File">
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    addNewFile();
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  className="inline-flex"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      addNewFile();
-                    }
-                  }}
-                >
-                  <PlusIcon
-                    size={18}
-                    className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
-                  />
-                </span>
-              </TooltipWrapper>
+              <button
+                type="button"
+                className="flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addNewFile();
+                }}
+                title="Add File"
+              >
+                <PlusIcon size={14} />
+              </button>
             )}
           </div>
         </div>

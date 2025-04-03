@@ -106,7 +106,7 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
         justify-between 
         items-center 
         pr-4 
-        pl-1
+        pl-2
         text-Neutrals/neutrals-8
   "
       >
@@ -118,13 +118,11 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
           FOLDERS
         </span>
         <TooltipWrapper tooltip="Create Folder">
-          <span className="inline-flex">
+          <span className="inline-flex p-1 hover:bg-slate-600 rounded-full transition-colors opacity-0 group-hover/title:opacity-100 transition-opacity duration-200 ease-in-out">
             <PlusIcon
               onClick={addFolderHandler}
-              size={22}
-              className="group-hover/title:inline-block
-              hidden 
-              cursor-pointer
+              size={16}
+              className="cursor-pointer
               hover:dark:text-white
             "
             />
