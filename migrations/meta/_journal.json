@@ -22,6 +22,20 @@
       "when": 1739206604327,
       "tag": "0002_modern_gabe_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1743701371411,
+      "tag": "0003_aromatic_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1743701737151,
+      "tag": "0004_late_quasar",
+      "breakpoints": true
     }
   ]
 }

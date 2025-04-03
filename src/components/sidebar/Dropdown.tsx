@@ -724,30 +724,46 @@ const Dropdown: React.FC<DropdownProps> = ({
 
           {/* Action buttons with smooth fade-in animation */}
           <div className="flex items-center gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out ml-1">
-            <button
-              type="button"
-              className="flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white"
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 moveToTrash(e);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  moveToTrash(e as unknown as React.MouseEvent);
+                }
+              }}
               title="Delete"
             >
               <Trash size={14} />
-            </button>
+            </div>
             
             {listType === 'folder' && !isEditing && (
-              <button
-                type="button"
-                className="flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white"
+              <div
+                role="button"
+                tabIndex={0}
+                className="flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
                   addNewFile();
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addNewFile();
+                  }
+                }}
                 title="Add File"
               >
                 <PlusIcon size={14} />
-              </button>
+              </div>
             )}
           </div>
         </div>

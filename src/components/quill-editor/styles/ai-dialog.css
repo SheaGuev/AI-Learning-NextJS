@@ -191,4 +191,57 @@
   width: 16px;
   height: 16px;
   margin-right: 8px;
+}
+
+/* PDF Upload Styles */
+.pdf-upload-container {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pdf-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background-color: #2e2e3e;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pdf-upload-button:hover {
+  background-color: #3e3e4e;
+  border-color: #6b7280;
+}
+
+.pdf-upload-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pdf-status {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: rgba(139, 92, 246, 0.15);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.pdf-status-icon {
+  color: #a78bfa;
+  margin-right: 8px;
+  font-weight: bold;
+}
+
+.pdf-status-text {
+  color: #e5e7eb;
 } 

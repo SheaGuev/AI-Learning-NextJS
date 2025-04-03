@@ -15,6 +15,7 @@ html, body{
 
 .ql-editor {
   padding: 1rem;
+  font-size: 16px;
 }
 
 .ql-toolbar.ql-snow {
@@ -30,6 +31,7 @@ html, body{
 .ql-editor {
   color: var(--foreground);
   background-color: transparent;
+  font-size: 16px;
 }
 
 /* @layer base {

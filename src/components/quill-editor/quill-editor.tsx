@@ -78,12 +78,12 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
   useContentLoader(quill, fileId, dirType);
   
   // AI generation handlers
-  const handleAIGenerate = useCallback(async (prompt: string, length: TextLengthOption) => {
+  const handleAIGenerate = useCallback(async (prompt: string, length: TextLengthOption, pdfText?: string) => {
     if (!quill || !currentRange) return;
     
     try {
       // Get some context from before the insertion point
-      const contextContent = quill.getText(
+      const contextContent = pdfText || quill.getText(
         Math.max(0, currentRange.index - 500), 
         Math.min(500, currentRange.index)
       );
@@ -185,6 +185,30 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
       quill.root.removeEventListener('ai-generate', handleAIGenerateEvent);
     };
   }, [quill, apiKeyExists]);
+  
+  // Add an effect to log Quill content when it changes
+  useEffect(() => {
+    if (quill && quill.getContents) {
+      const contentLog = () => {
+        const contents = quill.getContents();
+        console.log('Current Quill contents:', contents);
+        const stringified = JSON.stringify(contents);
+        console.log('Stringified content length:', stringified.length);
+        console.log('Content sample:', stringified.substring(0, 200) + '...');
+      };
+      
+      // Log once on init
+      contentLog();
+      
+      // And on text-change
+      const handler = () => contentLog();
+      quill.on('text-change', handler);
+      
+      return () => {
+        quill.off('text-change', handler);
+      };
+    }
+  }, [quill]);
   
   // Setup event handlers
   React.useEffect(() => {
@@ -310,6 +334,221 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
         toast({
           title: 'Error generating flashcards',
           description: error.message || 'Something went wrong while generating flashcards.',
+          variant: 'destructive',
+        });
+      }
+    };
+    
+    // Add PDF to flashcard handler
+    const handlePDFToFlashcard = async (e: any) => {
+      const { file, flashcardNode, cardCount = 10 } = e.detail;
+      
+      // Check if API key exists
+      if (!apiKeyExists) {
+        setShowAPIKeyDialog(true);
+        return;
+      }
+      
+      try {
+        // Show a loading message
+        toast({
+          title: 'Processing PDF',
+          description: 'Extracting text from your PDF...',
+        });
+        
+        // Save original Markdown module state and completely disable it
+        let markdownModule: any = null;
+        let originalOnTextChange: Function | null = null;
+        let originalOnRemoveElement: Function | null = null;
+        let originalProcessFn: Function | null = null;
+        let originalEnabled = false;
+        let originalMatches: any[] = [];
+        
+        try {
+          markdownModule = quill?.getModule('markdown');
+          
+          if (markdownModule) {
+            // Save original state
+            originalEnabled = markdownModule.options?.enabled || false;
+            originalMatches = markdownModule.matches ? [...markdownModule.matches] : [];
+            
+            // Grab original functions
+            if (markdownModule.activity) {
+              if (typeof markdownModule.activity.onTextChange === 'function') {
+                originalOnTextChange = markdownModule.activity.onTextChange;
+                // Replace with no-op function
+                markdownModule.activity.onTextChange = function() { return undefined; };
+              }
+              
+              if (typeof markdownModule.activity.onRemoveElement === 'function') {
+                originalOnRemoveElement = markdownModule.activity.onRemoveElement;
+                // Replace with safe function
+                markdownModule.activity.onRemoveElement = function() { return undefined; };
+              }
+            }
+            
+            // Disable the entire module
+            if (markdownModule.options) {
+              markdownModule.options.enabled = false;
+            }
+            
+            // Clear any pending matches
+            if (markdownModule.matches) {
+              markdownModule.matches = [];
+            }
+            
+            console.log('Markdown module temporarily disabled for PDF processing');
+          }
+          
+          // Use a CDN version of pdf.js to extract text
+          // First, dynamically load the PDF.js library if not already loaded
+          if (!window.pdfjsLib) {
+            await new Promise<void>((resolve, reject) => {
+              const script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+              script.onload = () => resolve();
+              script.onerror = () => reject(new Error('Failed to load PDF.js'));
+              document.head.appendChild(script);
+            });
+          }
+          
+          // Read the PDF file
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfData = new Uint8Array(arrayBuffer);
+          
+          // Load the PDF document
+          if (!window.pdfjsLib) {
+            throw new Error('PDF.js library failed to load properly');
+          }
+          const loadingTask = window.pdfjsLib.getDocument({ data: pdfData });
+          const pdf = await loadingTask.promise;
+          
+          // Extract text from all pages
+          let extractedText = '';
+          const totalPages = pdf.numPages;
+          
+          for (let i = 1; i <= totalPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const textItems = textContent.items.map((item: any) => item.str).join(' ');
+            extractedText += textItems + '\n\n';
+          }
+          
+          // Trim the extracted text to avoid exceeding token limits
+          const maxLength = 15000; // Adjust based on your API's limits
+          if (extractedText.length > maxLength) {
+            extractedText = extractedText.substring(0, maxLength) + '...';
+            toast({
+              title: 'PDF content truncated',
+              description: 'The PDF was too large and has been truncated for processing.',
+            });
+          }
+          
+          // Update toast
+          toast({
+            title: 'Generating flashcards',
+            description: 'AI is analyzing your PDF content...',
+          });
+          
+          // Generate flashcards using the AI
+          const prompt = `Create ${cardCount} educational flashcards in the format of question-answer pairs from the following PDF content. 
+          Each card should have a clear, concise question on the front and a comprehensive answer on the back.
+          Make the questions challenging but fair, focusing on the most important concepts.
+          Format your response as a JSON array of objects with 'front' and 'back' properties:
+          [
+            { "front": "Question 1", "back": "Answer 1" },
+            { "front": "Question 2", "back": "Answer 2" }
+          ]
+          Content: ${extractedText}`;
+          
+          const generatedText = await generateText(prompt, '');
+          
+          if (generatedText) {
+            try {
+              // Parse the generated text as JSON
+              let cardData;
+              
+              // Extract JSON if it's within a code block
+              if (generatedText.includes('```json')) {
+                const jsonMatch = generatedText.match(/```json([\s\S]*?)```/);
+                cardData = JSON.parse(jsonMatch ? jsonMatch[1].trim() : generatedText);
+              } else if (generatedText.includes('```')) {
+                const jsonMatch = generatedText.match(/```([\s\S]*?)```/);
+                cardData = JSON.parse(jsonMatch ? jsonMatch[1].trim() : generatedText);
+              } else {
+                // Try to parse the whole response as JSON
+                cardData = JSON.parse(generatedText);
+              }
+              
+              // Validate the data structure
+              if (!Array.isArray(cardData) || cardData.length === 0) {
+                throw new Error('Invalid data format');
+              }
+              
+              // Update the flashcard with the generated content
+              const cardFormat = flashcardNode._value || {};
+              cardFormat.cards = cardData.map((card: any) => ({
+                front: card.front || 'Question',
+                back: card.back || 'Answer'
+              }));
+              cardFormat.currentIndex = 0;
+              cardFormat.isFlipped = false;
+              
+              // Get the Quill blot instance and update it
+              const blot = quill.constructor.find(flashcardNode);
+              if (blot) {
+                // Create an update event to be handled by the flashcard blot
+                const updateEvent = new CustomEvent('flashcard-update', {
+                  detail: cardFormat,
+                  bubbles: false
+                });
+                
+                // Dispatch the event to update the flashcard
+                flashcardNode.dispatchEvent(updateEvent);
+                
+                toast({
+                  title: 'Flashcards generated from PDF',
+                  description: `Successfully created ${cardData.length} flashcards from your PDF.`,
+                });
+              }
+            } catch (error) {
+              console.error('Error parsing AI response:', error, generatedText);
+              toast({
+                title: 'Error generating flashcards',
+                description: 'Failed to parse AI response. Please try again.',
+                variant: 'destructive',
+              });
+            }
+          }
+        } finally {
+          // Restore Markdown processor state
+          if (markdownModule) {
+            // Restore enabled state
+            if (markdownModule.options && originalEnabled !== undefined) {
+              markdownModule.options.enabled = originalEnabled;
+            }
+            
+            // Restore matches
+            if (markdownModule.matches) {
+              markdownModule.matches = originalMatches;
+            }
+            
+            // Restore the original functions
+            if (markdownModule.activity) {
+              if (originalOnTextChange) {
+                markdownModule.activity.onTextChange = originalOnTextChange;
+              }
+              if (originalOnRemoveElement) {
+                markdownModule.activity.onRemoveElement = originalOnRemoveElement;
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error('Error processing PDF:', error);
+        toast({
+          title: 'Error processing PDF',
+          description: error.message || 'Something went wrong while processing your PDF.',
           variant: 'destructive',
         });
       }
@@ -493,11 +732,282 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
       }
     };
     
+    // Add PDF to quiz handler
+    const handlePDFToQuiz = async (e: any) => {
+      const { file, quizNode, questionCount = 5 } = e.detail;
+      
+      // Check if API key exists
+      if (!apiKeyExists) {
+        setShowAPIKeyDialog(true);
+        return;
+      }
+      
+      try {
+        // Show a loading message
+        toast({
+          title: 'Processing PDF',
+          description: 'Extracting text from your PDF...',
+        });
+        
+        // Save original Markdown module state and completely disable it
+        let markdownModule: any = null;
+        let originalOnTextChange: Function | null = null;
+        let originalOnRemoveElement: Function | null = null;
+        let originalProcessFn: Function | null = null;
+        let originalEnabled = false;
+        let originalMatches: any[] = [];
+        
+        try {
+          markdownModule = quill?.getModule('markdown');
+          
+          if (markdownModule) {
+            // Save original state
+            originalEnabled = markdownModule.options?.enabled || false;
+            originalMatches = markdownModule.matches ? [...markdownModule.matches] : [];
+            
+            // Grab original functions
+            if (markdownModule.activity) {
+              if (typeof markdownModule.activity.onTextChange === 'function') {
+                originalOnTextChange = markdownModule.activity.onTextChange;
+                // Replace with no-op function
+                markdownModule.activity.onTextChange = function() { return undefined; };
+              }
+              
+              if (typeof markdownModule.activity.onRemoveElement === 'function') {
+                originalOnRemoveElement = markdownModule.activity.onRemoveElement;
+                // Replace with safe function
+                markdownModule.activity.onRemoveElement = function() { return undefined; };
+              }
+            }
+            
+            // Disable the entire module
+            if (markdownModule.options) {
+              markdownModule.options.enabled = false;
+            }
+            
+            // Clear any pending matches
+            if (markdownModule.matches) {
+              markdownModule.matches = [];
+            }
+            
+            console.log('Markdown module temporarily disabled for PDF processing');
+          }
+          
+          // Use a CDN version of pdf.js to extract text
+          // First, dynamically load the PDF.js library if not already loaded
+          if (!window.pdfjsLib) {
+            await new Promise<void>((resolve, reject) => {
+              const script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+              script.onload = () => resolve();
+              script.onerror = () => reject(new Error('Failed to load PDF.js'));
+              document.head.appendChild(script);
+            });
+          }
+          
+          // Read the PDF file
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfData = new Uint8Array(arrayBuffer);
+          
+          // Load the PDF document
+          if (!window.pdfjsLib) {
+            throw new Error('PDF.js library failed to load properly');
+          }
+          const loadingTask = window.pdfjsLib.getDocument({ data: pdfData });
+          const pdf = await loadingTask.promise;
+          
+          // Extract text from all pages
+          let extractedText = '';
+          const totalPages = pdf.numPages;
+          
+          for (let i = 1; i <= totalPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const textItems = textContent.items.map((item: any) => item.str).join(' ');
+            extractedText += textItems + '\n\n';
+          }
+          
+          // Trim the extracted text to avoid exceeding token limits
+          const maxLength = 15000; // Adjust based on your API's limits
+          if (extractedText.length > maxLength) {
+            extractedText = extractedText.substring(0, maxLength) + '...';
+            toast({
+              title: 'PDF content truncated',
+              description: 'The PDF was too large and has been truncated for processing.',
+            });
+          }
+          
+          // Update toast
+          toast({
+            title: 'Generating quiz',
+            description: 'AI is analyzing your PDF content...',
+          });
+          
+          // Generate quiz questions using the AI
+          const prompt = `Create ${questionCount} multiple-choice quiz questions from the following PDF content. 
+          Each question should have exactly 4 options with only one correct answer.
+          Make the questions challenging but fair, focusing on the most important concepts.
+          Format your response as a JSON array of objects:
+          [
+            {
+              "question": "Question text here?",
+              "options": [
+                { "text": "Option 1 (correct answer)", "isCorrect": true },
+                { "text": "Option 2", "isCorrect": false },
+                { "text": "Option 3", "isCorrect": false },
+                { "text": "Option 4", "isCorrect": false }
+              ]
+            }
+          ]
+          Content: ${extractedText}`;
+          
+          const generatedText = await generateText(prompt, '');
+          
+          if (generatedText) {
+            try {
+              // Parse the generated text as JSON
+              let questionData;
+              
+              // Extract JSON if it's within a code block
+              if (generatedText.includes('```json')) {
+                const jsonMatch = generatedText.match(/```json([\s\S]*?)```/);
+                questionData = JSON.parse(jsonMatch ? jsonMatch[1].trim() : generatedText);
+              } else if (generatedText.includes('```')) {
+                const jsonMatch = generatedText.match(/```([\s\S]*?)```/);
+                questionData = JSON.parse(jsonMatch ? jsonMatch[1].trim() : generatedText);
+              } else {
+                // Try to parse the whole response as JSON
+                questionData = JSON.parse(generatedText);
+              }
+              
+              // Validate the data structure
+              if (!Array.isArray(questionData) || questionData.length === 0) {
+                throw new Error('Invalid data format');
+              }
+              
+              // Ensure each question has exactly 4 options and one correct answer
+              questionData = questionData.map((q: any) => {
+                // Make sure we have a question
+                const question = q.question || 'Question';
+                
+                // Make sure we have options
+                let options = Array.isArray(q.options) ? [...q.options] : [];
+                
+                // Make sure we have exactly 4 options
+                if (options.length < 4) {
+                  // Add default options if needed
+                  while (options.length < 4) {
+                    options.push({
+                      text: `Option ${options.length + 1}`,
+                      isCorrect: false
+                    });
+                  }
+                } else if (options.length > 4) {
+                  // Trim extra options
+                  options = options.slice(0, 4);
+                }
+                
+                // Now check for correct answers
+                const correctCount = options.filter((o: any) => o.isCorrect).length;
+                
+                // Ensure we have exactly one correct answer
+                if (correctCount === 0) {
+                  // No correct answers, mark a random option as correct
+                  const randomIndex = Math.floor(Math.random() * options.length);
+                  options[randomIndex].isCorrect = true;
+                } else if (correctCount > 1) {
+                  // Too many correct answers, keep only one random one
+                  const correctOptions = options.filter((o: any) => o.isCorrect);
+                  const randomCorrect = correctOptions[Math.floor(Math.random() * correctOptions.length)];
+                  options = options.map((o: any) => ({
+                    ...o,
+                    isCorrect: o === randomCorrect
+                  }));
+                }
+                
+                return {
+                  question,
+                  options
+                };
+              });
+              
+              // Update the quiz with the generated content
+              const quizFormat = {
+                questions: questionData,
+                currentIndex: 0
+              };
+              
+              // Get the Quill blot instance and update it
+              const blot = quill.constructor.find(quizNode);
+              if (blot) {
+                // Create an update event to be handled by the quiz blot
+                const updateEvent = new CustomEvent('quiz-update', {
+                  detail: quizFormat,
+                  bubbles: false
+                });
+                
+                // Dispatch the event to update the quiz
+                quizNode.dispatchEvent(updateEvent);
+                
+                toast({
+                  title: 'Quiz generated from PDF',
+                  description: `Successfully created ${questionData.length} quiz questions from your PDF.`,
+                });
+              }
+            } catch (error) {
+              console.error('Error parsing AI response:', error, generatedText);
+              toast({
+                title: 'Error generating quiz',
+                description: 'Failed to parse AI response. Please try again.',
+                variant: 'destructive',
+              });
+            }
+          }
+        } finally {
+          // Restore Markdown processor state
+          if (markdownModule) {
+            // Restore enabled state
+            if (markdownModule.options && originalEnabled !== undefined) {
+              markdownModule.options.enabled = originalEnabled;
+            }
+            
+            // Restore matches
+            if (markdownModule.matches) {
+              markdownModule.matches = originalMatches;
+            }
+            
+            // Restore the original functions
+            if (markdownModule.activity) {
+              if (originalOnTextChange) {
+                markdownModule.activity.onTextChange = originalOnTextChange;
+              }
+              if (originalOnRemoveElement) {
+                markdownModule.activity.onRemoveElement = originalOnRemoveElement;
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error('Error processing PDF:', error);
+        toast({
+          title: 'Error processing PDF',
+          description: error.message || 'Something went wrong while processing your PDF.',
+          variant: 'destructive',
+        });
+      }
+    };
+    
     // Listen for the flashcard AI generation event
     document.addEventListener('flashcard-ai-generate', handleFlashcardAIGenerate);
     
+    // Listen for the PDF upload event for flashcards
+    document.addEventListener('flashcard-pdf-upload', handlePDFToFlashcard);
+    
     // Listen for the quiz AI generation event
     document.addEventListener('quiz-ai-generate', handleQuizAIGenerate);
+    
+    // Listen for the PDF upload event for quiz
+    document.addEventListener('quiz-pdf-upload', handlePDFToQuiz);
     
     // Direct test for keyboard input
     quill.root.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -606,7 +1116,9 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
       document.removeEventListener('keydown', globalSlashHandler);
       document.removeEventListener('keydown', handleGlobalKeydown, true);
       document.removeEventListener('flashcard-ai-generate', handleFlashcardAIGenerate);
+      document.removeEventListener('flashcard-pdf-upload', handlePDFToFlashcard);
       document.removeEventListener('quiz-ai-generate', handleQuizAIGenerate);
+      document.removeEventListener('quiz-pdf-upload', handlePDFToQuiz);
     };
   }, [quill, quillHandler, setupSelectionHandler, generateText, apiKeyExists, toast]);
 
@@ -729,6 +1241,9 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
           collaborators={collaborators}
           saving={saving}
           onExportMarkdown={handleExportMarkdown}
+          fileId={fileId || undefined}
+          folderId={dirType === 'file' ? dirDetails?.id || undefined : undefined}
+          fileContent={quill?.getContents() ? JSON.stringify(quill.getContents()) : undefined}
         />
       </div>
       

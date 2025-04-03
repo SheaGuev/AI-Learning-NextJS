@@ -80,8 +80,15 @@ export const FlashcardBlot: FlashcardBlotStatic = {
     generateButton.className = 'ql-flashcard-nav-btn ql-flashcard-generate';
     generateButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`;
     generateButton.title = 'Generate flashcards with AI';
+
+    // Add PDF upload button
+    const pdfUploadButton = document.createElement('button');
+    pdfUploadButton.className = 'ql-flashcard-nav-btn ql-flashcard-upload-pdf';
+    pdfUploadButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-type-2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 12h8"/><path d="M8 16h8"/><path d="M8 20h8"/></svg>`;
+    pdfUploadButton.title = 'Create flashcards from PDF';
     
     // Add buttons to card actions
+    cardActions.appendChild(pdfUploadButton);
     cardActions.appendChild(generateButton);
     cardActions.appendChild(addButton);
     cardActions.appendChild(deleteButton);
@@ -799,6 +806,333 @@ export const FlashcardBlot: FlashcardBlotStatic = {
         }
       });
     });
+
+    // Add click handler for PDF upload
+    pdfUploadButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Create a PDF settings modal instead of immediately opening file picker
+      const createPDFSettingsModal = () => {
+        const modal = document.createElement('div');
+        modal.className = 'pdf-settings-modal';
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        modal.style.display = 'flex';
+        modal.style.justifyContent = 'center';
+        modal.style.alignItems = 'center';
+        modal.style.zIndex = '1000';
+        
+        const content = document.createElement('div');
+        content.style.backgroundColor = '#1e1e2e';
+        content.style.padding = '25px';
+        content.style.borderRadius = '10px';
+        content.style.width = '450px';
+        content.style.maxWidth = '90%';
+        content.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+        content.style.border = '1px solid #6d28d9';
+        
+        // Add title
+        const title = document.createElement('h3');
+        title.textContent = 'Generate Flashcards from PDF';
+        title.style.margin = '0 0 15px 0';
+        title.style.color = '#f8f8f2';
+        title.style.fontSize = '20px';
+        title.style.display = 'flex';
+        title.style.alignItems = 'center';
+        title.style.gap = '8px';
+        
+        // Add PDF icon to title
+        const titleIcon = document.createElement('span');
+        titleIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6d28d9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 12h8"/><path d="M8 16h8"/><path d="M8 20h8"/></svg>`;
+        
+        title.prepend(titleIcon);
+        
+        // Add description
+        const desc = document.createElement('p');
+        desc.textContent = 'Select a PDF file and choose how many flashcards to generate from its content.';
+        desc.style.margin = '0 0 20px 0';
+        desc.style.color = '#94a3b8';
+        desc.style.fontSize = '14px';
+        desc.style.lineHeight = '1.5';
+        
+        // Card count selection
+        const countContainer = document.createElement('div');
+        countContainer.style.marginBottom = '20px';
+        
+        const countLabel = document.createElement('label');
+        countLabel.textContent = 'Number of flashcards to generate:';
+        countLabel.style.display = 'block';
+        countLabel.style.marginBottom = '10px';
+        countLabel.style.color = '#f8f8f2';
+        countLabel.style.fontSize = '14px';
+        
+        // Create slider with value display
+        const sliderContainer = document.createElement('div');
+        sliderContainer.style.display = 'flex';
+        sliderContainer.style.alignItems = 'center';
+        sliderContainer.style.gap = '15px';
+        
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '3';
+        slider.max = '20';
+        slider.value = '10'; // Default to 10 cards
+        slider.style.flex = '1';
+        slider.style.height = '8px';
+        slider.style.appearance = 'none';
+        slider.style.backgroundColor = '#44475a';
+        slider.style.borderRadius = '4px';
+        slider.style.outline = 'none';
+        
+        // Add thumb styling
+        const style = document.createElement('style');
+        style.innerHTML = `
+          input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #6d28d9;
+            cursor: pointer;
+          }
+          input[type=range]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #6d28d9;
+            cursor: pointer;
+            border: none;
+          }
+        `;
+        document.head.appendChild(style);
+        
+        const countValue = document.createElement('div');
+        countValue.textContent = '10';
+        countValue.style.width = '30px';
+        countValue.style.fontWeight = 'bold';
+        countValue.style.color = '#f8f8f2';
+        countValue.style.fontSize = '18px';
+        countValue.style.textAlign = 'center';
+        
+        slider.addEventListener('input', () => {
+          countValue.textContent = slider.value;
+        });
+        
+        sliderContainer.appendChild(slider);
+        sliderContainer.appendChild(countValue);
+        
+        countContainer.appendChild(countLabel);
+        countContainer.appendChild(sliderContainer);
+        
+        // Add buttons
+        const buttons = document.createElement('div');
+        buttons.style.display = 'flex';
+        buttons.style.justifyContent = 'flex-end';
+        buttons.style.gap = '12px';
+        buttons.style.marginTop = '20px';
+        
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Cancel';
+        cancelButton.style.backgroundColor = 'transparent';
+        cancelButton.style.color = '#f8f8f2';
+        cancelButton.style.border = '1px solid #44475a';
+        cancelButton.style.borderRadius = '6px';
+        cancelButton.style.padding = '10px 20px';
+        cancelButton.style.cursor = 'pointer';
+        cancelButton.style.fontSize = '14px';
+        
+        const selectButton = document.createElement('button');
+        selectButton.textContent = 'Select PDF';
+        selectButton.style.background = 'linear-gradient(to right, #4c1d95, #6d28d9)';
+        selectButton.style.color = 'white';
+        selectButton.style.border = 'none';
+        selectButton.style.borderRadius = '6px';
+        selectButton.style.padding = '10px 20px';
+        selectButton.style.cursor = 'pointer';
+        selectButton.style.fontSize = '14px';
+        selectButton.style.fontWeight = '500';
+        
+        // Add hover effects
+        selectButton.addEventListener('mouseover', () => {
+          selectButton.style.background = 'linear-gradient(to right, #5b21b6, #7c3aed)';
+        });
+        
+        selectButton.addEventListener('mouseout', () => {
+          selectButton.style.background = 'linear-gradient(to right, #4c1d95, #6d28d9)';
+        });
+        
+        cancelButton.addEventListener('mouseover', () => {
+          cancelButton.style.backgroundColor = '#282a36';
+        });
+        
+        cancelButton.addEventListener('mouseout', () => {
+          cancelButton.style.backgroundColor = 'transparent';
+        });
+        
+        // Add event handlers
+        cancelButton.addEventListener('click', () => {
+          document.body.removeChild(modal);
+        });
+        
+        selectButton.addEventListener('click', () => {
+          // Store the selected card count 
+          const cardCount = parseInt(slider.value);
+          
+          // Close settings modal
+          document.body.removeChild(modal);
+          
+          // Create a file input element
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = 'application/pdf';
+          fileInput.style.display = 'none';
+          document.body.appendChild(fileInput);
+          
+          // Handle file selection
+          fileInput.addEventListener('change', async () => {
+            const file = fileInput.files?.[0];
+            if (!file) {
+              document.body.removeChild(fileInput);
+              return;
+            }
+            
+            // Show loading overlay
+            const overlay = createLoadingOverlay();
+            document.body.appendChild(overlay);
+            
+            try {
+              // Create custom event for PDF processing
+              const pdfEvent = new CustomEvent('flashcard-pdf-upload', {
+                detail: { 
+                  file,
+                  flashcardNode: node,
+                  cardCount // Pass the selected card count
+                },
+                bubbles: true
+              });
+              
+              // Dispatch event to be handled at the editor level
+              node.dispatchEvent(pdfEvent);
+              
+            } catch (error) {
+              console.error('Error processing PDF:', error);
+              
+              // Show error message
+              const errorModal = document.createElement('div');
+              errorModal.style.position = 'fixed';
+              errorModal.style.top = '20px';
+              errorModal.style.left = '50%';
+              errorModal.style.transform = 'translateX(-50%)';
+              errorModal.style.backgroundColor = '#ff5555';
+              errorModal.style.color = 'white';
+              errorModal.style.padding = '10px 20px';
+              errorModal.style.borderRadius = '5px';
+              errorModal.style.zIndex = '1001';
+              errorModal.textContent = 'Error processing PDF. Please try again.';
+              
+              document.body.appendChild(errorModal);
+              
+              // Remove error message after 3 seconds
+              setTimeout(() => {
+                if (document.body.contains(errorModal)) {
+                  document.body.removeChild(errorModal);
+                }
+              }, 3000);
+            } finally {
+              // Remove loading overlay and file input
+              document.body.removeChild(overlay);
+              document.body.removeChild(fileInput);
+            }
+          });
+          
+          // Trigger file selection
+          fileInput.click();
+        });
+        
+        buttons.appendChild(cancelButton);
+        buttons.appendChild(selectButton);
+        
+        // Assemble modal content
+        content.appendChild(title);
+        content.appendChild(desc);
+        content.appendChild(countContainer);
+        content.appendChild(buttons);
+        
+        modal.appendChild(content);
+        return modal;
+      };
+      
+      // Create a loading overlay
+      const createLoadingOverlay = () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'pdf-loading-overlay';
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '1000';
+        
+        const content = document.createElement('div');
+        content.style.backgroundColor = '#1e1e2e';
+        content.style.padding = '25px';
+        content.style.borderRadius = '10px';
+        content.style.display = 'flex';
+        content.style.flexDirection = 'column';
+        content.style.alignItems = 'center';
+        content.style.gap = '15px';
+        
+        const spinner = document.createElement('div');
+        spinner.className = 'pdf-spinner';
+        spinner.style.width = '40px';
+        spinner.style.height = '40px';
+        spinner.style.border = '4px solid rgba(255, 255, 255, 0.1)';
+        spinner.style.borderTopColor = '#7c3aed';
+        spinner.style.borderRadius = '50%';
+        spinner.style.animation = 'pdf-spin 1s linear infinite';
+        
+        const message = document.createElement('div');
+        message.textContent = 'Processing PDF...';
+        message.style.color = 'white';
+        message.style.fontSize = '16px';
+        
+        // Add keyframes for spinner animation
+        const style = document.createElement('style');
+        style.innerHTML = `
+          @keyframes pdf-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `;
+        document.head.appendChild(style);
+        
+        content.appendChild(spinner);
+        content.appendChild(message);
+        overlay.appendChild(content);
+        
+        return overlay;
+      };
+      
+      // Show the settings modal
+      const modal = createPDFSettingsModal();
+      document.body.appendChild(modal);
+      
+      // Close if clicking outside content
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      });
+    });
     
     // Assemble navigation controls
     navControls.appendChild(prevButton);
@@ -1013,6 +1347,8 @@ export const FlashcardBlot: FlashcardBlotStatic = {
   },
   
   value(node: HTMLElement) {
+    console.log('FlashcardBlot value method called for node:', node);
+    
     const container = node.querySelector('.ql-flashcard-container') as HTMLElement;
     const currentIndex = parseInt(container?.dataset.currentIndex || '0');
     const isFlipped = container?.classList.contains('flipped') || false;
@@ -1024,6 +1360,8 @@ export const FlashcardBlot: FlashcardBlotStatic = {
     const fronts = node.querySelectorAll('.ql-flashcard-front');
     const backs = node.querySelectorAll('.ql-flashcard-back');
     
+    console.log('Found fronts/backs:', { frontsCount: fronts.length, backsCount: backs.length });
+    
     fronts.forEach((front, idx) => {
       const frontContent = front.querySelector('.ql-flashcard-content');
       const backContent = backs[idx]?.querySelector('.ql-flashcard-content');
@@ -1034,11 +1372,14 @@ export const FlashcardBlot: FlashcardBlotStatic = {
       });
     });
     
-    return {
+    const result = {
       cards,
       currentIndex,
       isFlipped
     };
+    
+    console.log('FlashcardBlot value result:', result);
+    return result;
   }
 };
 

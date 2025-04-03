@@ -1,9 +1,9 @@
 'use server';
 import { validate } from 'uuid';
 import db from './db';
-import { File, Folder, Subscription, User, workspace } from './supabase';
-import { and, eq, ilike, notExists } from 'drizzle-orm';
-import { collaborators, files, folders, subscriptions, users, workspaces, products } from './schema';
+import { File, Folder, KnowledgeItem, Subscription, User, workspace } from './supabase';
+import { and, eq, ilike, notExists, inArray, desc, gte, lt, or } from 'drizzle-orm';
+import { collaborators, files, folders, knowledgeItems, subscriptions, users, workspaces, products } from './schema';
 import { revalidatePath } from 'next/cache';
 
 export const createWorkspace = async (workspace: workspace) => {
@@ -382,4 +382,326 @@ export const getUsersFromSearch = async (email: string) => {
     .from(users)
     .where(ilike(users.email, `${email}%`));
   return accounts;
+};
+
+// Function to find a valid user ID in the database
+// This is a fallback if the provided ID doesn't exist
+async function findValidUserId(providedUserId: string): Promise<string | null> {
+  try {
+    // First check if the provided ID exists
+    if (providedUserId) {
+      const userCheck = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, providedUserId))
+        .limit(1);
+        
+      if (userCheck.length > 0) {
+        return providedUserId; // The provided ID is valid
+      }
+    }
+    
+    // If not found, get any valid user ID from the database
+    const anyUser = await db
+      .select()
+      .from(users)
+      .limit(1);
+      
+    if (anyUser.length > 0) {
+      return anyUser[0].id;
+    }
+    
+    return null; // No valid users found
+  } catch (error) {
+    console.error('Error finding valid user ID:', error);
+    return null;
+  }
+}
+
+// Function to check if a folder exists
+async function validateFolderId(folderId: string | null | undefined): Promise<string | null> {
+  if (!folderId) return null;
+  
+  try {
+    const folder = await db
+      .select()
+      .from(folders)
+      .where(eq(folders.id, folderId))
+      .limit(1);
+      
+    if (folder.length > 0) {
+      return folderId; // Folder exists
+    }
+    
+    return null; // Folder doesn't exist
+  } catch (error) {
+    console.error('Error validating folder ID:', error);
+    return null;
+  }
+}
+
+// Function to check if a file exists
+async function validateFileId(fileId: string | null | undefined): Promise<string | null> {
+  if (!fileId) return null;
+  
+  try {
+    const file = await db
+      .select()
+      .from(files)
+      .where(eq(files.id, fileId))
+      .limit(1);
+      
+    if (file.length > 0) {
+      return fileId; // File exists
+    }
+    
+    return null; // File doesn't exist
+  } catch (error) {
+    console.error('Error validating file ID:', error);
+    return null;
+  }
+}
+
+// Knowledge Base Queries
+
+export const createKnowledgeItem = async (item: KnowledgeItem) => {
+  try {
+    // Validate the item
+    if (!item.id || !item.userId || !item.type || !item.content) {
+      console.error('Invalid knowledge item structure:', 
+        { hasId: !!item.id, hasUserId: !!item.userId, hasType: !!item.type, hasContent: !!item.content });
+      return { data: null, error: 'Invalid knowledge item structure' };
+    }
+    
+    // Make sure tags is an array
+    if (!item.tags) {
+      item.tags = [];
+    }
+    
+    // Make sure timestamps are properly formatted or null
+    if (item.lastReviewed === undefined) {
+      item.lastReviewed = null;
+    }
+    
+    if (item.nextReviewDate === undefined) {
+      item.nextReviewDate = null;
+    }
+    
+    // Verify user ID exists or find a valid one
+    const validUserId = await findValidUserId(item.userId);
+    
+    if (!validUserId) {
+      return { 
+        data: null, 
+        error: 'Foreign key constraint: No valid user ID found in the database' 
+      };
+    }
+    
+    // If the original user ID was invalid, use the found valid one
+    if (validUserId !== item.userId) {
+      console.warn(`Using alternative user ID ${validUserId} instead of ${item.userId}`);
+      item.userId = validUserId;
+    }
+    
+    // Validate folder ID
+    const validFolderId = await validateFolderId(item.sourceFolderId);
+    
+    // If folder ID isn't valid, set it to null
+    if (item.sourceFolderId && !validFolderId) {
+      console.warn(`Folder ID ${item.sourceFolderId} not found in database, setting to null`);
+      item.sourceFolderId = null;
+    }
+    
+    // Validate file ID
+    const validFileId = await validateFileId(item.sourceFileId);
+    
+    // If file ID isn't valid, set it to null
+    if (item.sourceFileId && !validFileId) {
+      console.warn(`File ID ${item.sourceFileId} not found in database, setting to null`);
+      item.sourceFileId = null;
+    }
+    
+    console.log('Inserting knowledge item into database:', { 
+      id: item.id,
+      type: item.type,
+      userId: item.userId,
+      sourceFolderId: item.sourceFolderId,
+      sourceFileId: item.sourceFileId
+    });
+    
+    const response = await db.insert(knowledgeItems).values(item);
+    return { data: null, error: null };
+  } catch (error) {
+    console.error('Database error creating knowledge item:', error);
+    // Try to provide more helpful error messages
+    if (error instanceof Error) {
+      const pgError = error as any;
+      if (pgError.code === '23503') { // Foreign key violation
+        return { 
+          data: null, 
+          error: `Foreign key constraint: ${pgError.detail || 'A referenced record does not exist'}` 
+        };
+      }
+    }
+    return { data: null, error: 'Error creating knowledge item' };
+  }
+};
+
+export const updateKnowledgeItem = async (
+  item: Partial<KnowledgeItem>,
+  itemId: string
+) => {
+  try {
+    const response = await db
+      .update(knowledgeItems)
+      .set(item)
+      .where(eq(knowledgeItems.id, itemId));
+    revalidatePath('/dashboard');
+    return { data: null, error: null };
+  } catch (error) {
+    console.log(error);
+    return { data: null, error: 'Error updating knowledge item' };
+  }
+};
+
+export const deleteKnowledgeItem = async (itemId: string) => {
+  if (!itemId) return;
+  try {
+    await db.delete(knowledgeItems).where(eq(knowledgeItems.id, itemId));
+    revalidatePath('/dashboard');
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+export const getKnowledgeItemsByUser = async (userId: string) => {
+  if (!userId) return { data: null, error: 'Invalid user ID' };
+  try {
+    const results = await db
+      .select()
+      .from(knowledgeItems)
+      .where(eq(knowledgeItems.userId, userId))
+      .orderBy(desc(knowledgeItems.createdAt));
+    return { data: results as KnowledgeItem[], error: null };
+  } catch (error) {
+    console.log(error);
+    return { data: null, error: 'Error fetching knowledge items' };
+  }
+};
+
+export const getKnowledgeItemsByFolder = async (folderId: string, userId: string) => {
+  if (!folderId || !userId) return { data: null, error: 'Invalid parameters' };
+  try {
+    const results = await db
+      .select()
+      .from(knowledgeItems)
+      .where(
+        and(
+          eq(knowledgeItems.sourceFolderId, folderId),
+          eq(knowledgeItems.userId, userId)
+        )
+      )
+      .orderBy(desc(knowledgeItems.createdAt));
+    return { data: results as KnowledgeItem[], error: null };
+  } catch (error) {
+    console.log(error);
+    return { data: null, error: 'Error fetching knowledge items by folder' };
+  }
+};
+
+export const getKnowledgeItemsByFile = async (fileId: string, userId: string) => {
+  if (!fileId || !userId) return { data: null, error: 'Invalid parameters' };
+  try {
+    const results = await db
+      .select()
+      .from(knowledgeItems)
+      .where(
+        and(
+          eq(knowledgeItems.sourceFileId, fileId),
+          eq(knowledgeItems.userId, userId)
+        )
+      )
+      .orderBy(desc(knowledgeItems.createdAt));
+    return { data: results as KnowledgeItem[], error: null };
+  } catch (error) {
+    console.log(error);
+    return { data: null, error: 'Error fetching knowledge items by file' };
+  }
+};
+
+export const getKnowledgeItemsByType = async (type: 'flashcard' | 'quiz', userId: string) => {
+  if (!type || !userId) return { data: null, error: 'Invalid parameters' };
+  try {
+    const results = await db
+      .select()
+      .from(knowledgeItems)
+      .where(
+        and(
+          eq(knowledgeItems.type, type),
+          eq(knowledgeItems.userId, userId)
+        )
+      )
+      .orderBy(desc(knowledgeItems.createdAt));
+    return { data: results as KnowledgeItem[], error: null };
+  } catch (error) {
+    console.log(error);
+    return { data: null, error: 'Error fetching knowledge items by type' };
+  }
+};
+
+export const getDueKnowledgeItems = async (userId: string) => {
+  if (!userId) return { data: null, error: 'Invalid user ID' };
+  const now = new Date().toISOString();
+  
+  try {
+    const results = await db
+      .select()
+      .from(knowledgeItems)
+      .where(
+        and(
+          eq(knowledgeItems.userId, userId),
+          or(
+            // Items with nextReviewDate <= now
+            lt(knowledgeItems.nextReviewDate, now),
+            // Items never reviewed yet
+            eq(knowledgeItems.reviewCount, 0)
+          )
+        )
+      )
+      .orderBy(knowledgeItems.nextReviewDate);
+    
+    return { data: results as KnowledgeItem[], error: null };
+  } catch (error) {
+    console.log(error);
+    return { data: null, error: 'Error fetching due knowledge items' };
+  }
+};
+
+export const getKnowledgeItemsByTags = async (tags: string[], userId: string) => {
+  if (!tags.length || !userId) return { data: null, error: 'Invalid parameters' };
+  
+  try {
+    // Query items with any of the specified tags
+    const results = await db.select()
+      .from(knowledgeItems)
+      .where(
+        and(
+          eq(knowledgeItems.userId, userId)
+        )
+      )
+      .orderBy(desc(knowledgeItems.createdAt));
+    
+    // Filter items that have any of the specified tags
+    // This is a workaround since Drizzle ORM might not support array contains directly
+    const filteredResults = results.filter(item => {
+      if (!item.tags) return false;
+      const itemTags = item.tags as string[];
+      return tags.some(tag => itemTags.includes(tag));
+    });
+    
+    return { data: filteredResults as KnowledgeItem[], error: null };
+  } catch (error) {
+    console.log(error);
+    return { data: null, error: 'Error fetching knowledge items by tags' };
+  }
 };

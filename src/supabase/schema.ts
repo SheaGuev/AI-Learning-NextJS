@@ -344,3 +344,50 @@ export const pricesRelations = relations(prices, ({ one }) => ({
     references: [products.id],
   }),
 }));
+
+// Knowledge base items for global study system
+export const knowledgeItemTypes = ['flashcard', 'quiz'] as const;
+
+export const knowledgeItems = pgTable('knowledge_items', {
+  id: uuid('id').defaultRandom().primaryKey().notNull(),
+  createdAt: timestamp('created_at', {
+    withTimezone: true,
+    mode: 'string',
+  })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', {
+    withTimezone: true,
+    mode: 'string',
+  })
+    .defaultNow()
+    .notNull(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, {
+      onDelete: 'cascade',
+    }),
+  type: text('type').notNull(),
+  content: jsonb('content').notNull(),
+  sourceFileId: uuid('source_file_id')
+    .references(() => files.id, {
+      onDelete: 'set null',
+    }),
+  sourceFolderId: uuid('source_folder_id')
+    .references(() => folders.id, {
+      onDelete: 'set null',
+    }),
+  tags: text('tags').array(),
+  lastReviewed: timestamp('last_reviewed', {
+    withTimezone: true,
+    mode: 'string',
+  }),
+  reviewCount: integer('review_count').default(0),
+  easeFactor: integer('ease_factor').default(250),
+  interval: integer('interval').default(1),
+  nextReviewDate: timestamp('next_review_date', {
+    withTimezone: true,
+    mode: 'string',
+  }),
+  performance: integer('performance').default(0),
+});

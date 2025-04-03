@@ -5,10 +5,11 @@ import AiTutor from '@/components/dashboard-tools/ai-tutor/ai-tutor';
 import FlashcardQuizGenerator from '@/components/dashboard-tools/flashcard-quiz/flashcard-quiz-generator';
 import LearningPathPlanner from '@/components/dashboard-tools/learning-path/learning-path-planner';
 import ResearchTool from '@/components/dashboard-tools/research/research-tool';
-import { RiRobot2Line, RiCodeLine, RiRoadMapLine, RiSearchLine } from 'react-icons/ri';
+import KnowledgeBaseDashboard from '@/components/dashboard-tools/knowledge-base/knowledge-base-dashboard';
+import { RiRobot2Line, RiCodeLine, RiRoadMapLine, RiSearchLine, RiBrainLine } from 'react-icons/ri';
 
 // Tool types
-type ToolType = 'ai-tutor' | 'flashcard-quiz' | 'learning-path' | 'research' | null;
+type ToolType = 'ai-tutor' | 'flashcard-quiz' | 'learning-path' | 'research' | 'knowledge-base' | null;
 
 interface ToolCardProps {
   title: string;
@@ -45,10 +46,10 @@ const DashboardTools: React.FC = () => {
       icon: <RiRobot2Line />,
     },
     {
-      id: 'flashcard-quiz',
-      title: 'Flashcards & Quiz',
-      description: 'Generate study materials from your files',
-      icon: <RiCodeLine />,
+      id: 'research',
+      title: 'Research Tool',
+      description: 'Find relevant sources and references',
+      icon: <RiSearchLine />,
     },
     {
       id: 'learning-path',
@@ -57,11 +58,17 @@ const DashboardTools: React.FC = () => {
       icon: <RiRoadMapLine />,
     },
     {
-      id: 'research',
-      title: 'Research Tool',
-      description: 'Find relevant sources and references',
-      icon: <RiSearchLine />,
+      id: 'knowledge-base',
+      title: 'Knowledge Base',
+      description: 'Centralized study system with spaced repetition',
+      icon: <RiBrainLine />,
     }
+    // {
+    //   id: 'flashcard-quiz',
+    //   title: 'Flashcards & Quiz',
+    //   description: 'Generate study materials from your files',
+    //   icon: <RiCodeLine />,
+    // }
   ];
 
   const renderActiveTool = () => {
@@ -74,6 +81,8 @@ const DashboardTools: React.FC = () => {
         return <LearningPathPlanner />;
       case 'research':
         return <ResearchTool />;
+      case 'knowledge-base':
+        return <KnowledgeBaseDashboard />;
       default:
         return null;
     }
@@ -81,7 +90,7 @@ const DashboardTools: React.FC = () => {
 
   return (
     <div className="flex flex-col space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {tools.map((tool) => (
           <ToolCard
             key={tool.id}

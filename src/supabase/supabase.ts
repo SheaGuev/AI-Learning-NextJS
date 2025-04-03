@@ -8,7 +8,7 @@ import {
   users,
   workspaces,
 } from '../../migrations/schema';
-import { files } from './schema';
+import { files, knowledgeItems } from './schema';
 
 export type Json =
   | string
@@ -480,8 +480,7 @@ export type CompositeTypes<
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
-
-    export type workspace = InferSelectModel<typeof workspaces>;
+export type workspace = InferSelectModel<typeof workspaces>;
 export type User = InferSelectModel<typeof users>;
 export type Folder = InferSelectModel<typeof folders>;
 export type File = InferSelectModel<typeof files>;
@@ -491,6 +490,7 @@ export type Customer = InferSelectModel<typeof customers>;
 export type Subscription = InferSelectModel<typeof subscriptions> & {
   prices: Price;
 };
+export type KnowledgeItem = InferSelectModel<typeof knowledgeItems>;
 
 export type ProductWithPrice = Product & {
   prices?: Price[];
