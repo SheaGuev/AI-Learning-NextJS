@@ -82,6 +82,13 @@ const KnowledgeBaseDashboard: React.FC = () => {
     maxCardsPerSession: 20
   });
   
+  // Today's study progress tracking
+  const [dailyProgress, setDailyProgress] = useLocalStorage('knowledge-base-daily-progress', {
+    date: new Date().toDateString(),
+    cardsStudied: 0,
+    totalDueCards: 0
+  });
+  
   // Files data
   const [fileMap, setFileMap] = useState<Record<string, string>>({});
   
@@ -117,7 +124,19 @@ const KnowledgeBaseDashboard: React.FC = () => {
     }
   }, [isStudyMode, currentStudyItem, studyItems, studyItemIndex]);
   
-  // Enhance the filtering effect to include better debug logging
+  // Add effect to reset daily progress at midnight
+  useEffect(() => {
+    const today = new Date().toDateString();
+    if (dailyProgress.date !== today) {
+      setDailyProgress({
+        date: today,
+        cardsStudied: 0,
+        totalDueCards: 0
+      });
+    }
+  }, [dailyProgress, setDailyProgress]);
+  
+  // Modify the filtering effect to calculate the correct number of cards due for review
   useEffect(() => {
     console.log(`Filtering items for view: ${activeView}, with ${selectedTags.length} selected tags`);
     
@@ -129,6 +148,27 @@ const KnowledgeBaseDashboard: React.FC = () => {
       try {
         let filtered: KnowledgeItem[] = [];
         const today = new Date();
+        
+        // Count cards due for review - only count flashcards and quizzes
+        const dueCardsCount = items.filter(item => {
+          // Only count flashcards and quizzes
+          if (item.type !== 'flashcard' && item.type !== 'quiz') return false;
+          
+          // Count new items (never reviewed)
+          if (!item.nextReviewDate || !item.lastReviewed) return true;
+          
+          // Count items due for review
+          const nextReviewDate = new Date(item.nextReviewDate);
+          return nextReviewDate <= today;
+        }).length;
+        
+        console.log(`Found ${dueCardsCount} cards due for review today`);
+        
+        // Update total due cards count in daily progress
+        setDailyProgress(prev => ({
+          ...prev,
+          totalDueCards: dueCardsCount
+        }));
         
         // First, filter by view type
         switch (activeView) {
@@ -487,6 +527,12 @@ const KnowledgeBaseDashboard: React.FC = () => {
           totalReviewed: prev.totalReviewed + 1
         }));
       }
+      
+      // Update daily progress
+      setDailyProgress(prev => ({
+        ...prev,
+        cardsStudied: prev.cardsStudied + 1
+      }));
       
       // Move to next item
       goToNextStudyItem();
@@ -1662,6 +1708,25 @@ const KnowledgeBaseDashboard: React.FC = () => {
             >
               Quizzes
             </button>
+          </div>
+          
+          {/* Daily Study Progress Bar */}
+          <div className="mb-4 mt-4">
+            <div className="flex justify-between text-xs text-gray-400 mb-1">
+              <span>Today's Review Progress</span>
+              <span>
+                {dailyProgress.cardsStudied} of {dailyProgress.totalDueCards} due cards reviewed
+              </span>
+            </div>
+            <div className="w-full h-2 bg-[#2d2d3a] rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-[#6052A8] rounded-full"
+                style={{ 
+                  width: `${dailyProgress.totalDueCards > 0 ? 
+                    Math.min(100, (dailyProgress.cardsStudied / dailyProgress.totalDueCards) * 100) : 0}%` 
+                }}
+              ></div>
+            </div>
           </div>
           
           {/* Tag filters */}
