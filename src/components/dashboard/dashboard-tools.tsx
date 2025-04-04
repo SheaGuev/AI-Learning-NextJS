@@ -40,6 +40,18 @@ const DashboardTools: React.FC = () => {
 
   const tools = [
     {
+      id: 'knowledge-base',
+      title: 'Knowledge Base',
+      description: 'Centralized study system with spaced repetition',
+      icon: <RiBrainLine />,
+    },
+    {
+      id: 'learning-path',
+      title: 'Learning Path Planner',
+      description: 'Chart your learning journey',
+      icon: <RiRoadMapLine />,
+    },
+    {
       id: 'ai-tutor',
       title: 'AI Tutor',
       description: 'Get learning assistance with AI-powered tutoring',
@@ -50,18 +62,6 @@ const DashboardTools: React.FC = () => {
       title: 'Research Tool',
       description: 'Find relevant sources and references',
       icon: <RiSearchLine />,
-    },
-    {
-      id: 'learning-path',
-      title: 'Learning Path Planner',
-      description: 'Chart your learning journey',
-      icon: <RiRoadMapLine />,
-    },
-    {
-      id: 'knowledge-base',
-      title: 'Knowledge Base',
-      description: 'Centralized study system with spaced repetition',
-      icon: <RiBrainLine />,
     }
     // {
     //   id: 'flashcard-quiz',
