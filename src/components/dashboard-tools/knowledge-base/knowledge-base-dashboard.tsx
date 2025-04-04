@@ -1715,7 +1715,10 @@ const KnowledgeBaseDashboard: React.FC = () => {
             <div className="flex justify-between text-xs text-gray-400 mb-1">
               <span>Today's Review Progress</span>
               <span>
-                {dailyProgress.cardsStudied} of {dailyProgress.totalDueCards} due cards reviewed
+                {dailyProgress.cardsStudied > dailyProgress.totalDueCards ? 
+                  `${dailyProgress.totalDueCards} of ${dailyProgress.totalDueCards} due cards reviewed (${dailyProgress.cardsStudied - dailyProgress.totalDueCards} extra)` : 
+                  `${dailyProgress.cardsStudied} of ${dailyProgress.totalDueCards} due cards reviewed`
+                }
               </span>
             </div>
             <div className="w-full h-2 bg-[#2d2d3a] rounded-full overflow-hidden">

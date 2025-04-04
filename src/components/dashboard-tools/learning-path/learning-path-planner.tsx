@@ -251,21 +251,21 @@ const LearningPathPlanner: React.FC = () => {
       }
 
       // Create a simplified prompt for the AI
-      const prompt = `Create a learning path for "${goal}" over ${currentTimeframe}.
+      const prompt = `Create a comprehensive learning path for "${goal}" over ${currentTimeframe}.
 ${includeSchedule ? `Include a study schedule using ${schedulePeriodType} (${schedulePeriodType === 'days' ? 'Day 1, Day 2' : schedulePeriodType === 'weeks' ? 'Week 1, Week 2' : 'Month 1, Month 2'})` : ''}
 
 Return ONLY this JSON structure with no additional text:
 {
-  "title": "Learning Path Title",
+  "title": "Short, Concise Learning Path Title (5-7 words)",
   "description": "Clear description",
   "modules": [
     {
-      "title": "Module Title",
+      "title": "Concise Module Title (3-5 words)",
       "description": "Module description",
       "estimatedTime": "Time estimate",
       "topics": [
         {
-          "title": "Topic Title",
+          "title": "Brief Topic Title (2-4 words)",
           "subtopics": ["Subtopic 1", "Subtopic 2"],
           "resources": ["Resource 1", "Resource 2"],
           "activities": ["Activity 1", "Activity 2"]
@@ -282,12 +282,14 @@ Return ONLY this JSON structure with no additional text:
   ]` : ''}
 }
 
-5 Rules:
-1. Use double quotes for ALL names and values
-2. NO trailing commas
-3. Valid JSON only
-4. NO text before or after the JSON
-5. NO markdown code blocks`;
+7 Rules:
+1. Create ${timeNumber <= 7 ? '4-5' : timeNumber <= 30 ? '5-8' : '6-10'} modules with progressive complexity
+2. Keep ALL titles short and concise - avoid long phrases and sentences
+3. Balance content evenly across modules rather than front-loading information
+4. Use double quotes for ALL names and values
+5. NO trailing commas
+6. Valid JSON only
+7. NO text before or after the JSON`;
 
       const response = await generateResponse(prompt);
       
@@ -423,16 +425,16 @@ ${extractedText}
 
 Return ONLY this JSON structure with no additional text:
 {
-  "title": "Learning Path Title",
+  "title": "Short, Concise Title (5-7 words)",
   "description": "Clear description",
   "modules": [
     {
-      "title": "Module Title",
+      "title": "Brief Module Title (3-5 words)",
       "description": "Module description",
       "estimatedTime": "Time estimate",
       "topics": [
         {
-          "title": "Topic Title",
+          "title": "Short Topic Title (2-4 words)",
           "subtopics": ["Subtopic 1", "Subtopic 2"],
           "resources": ["Resource 1", "Resource 2"],
           "activities": ["Activity 1", "Activity 2"]
@@ -450,11 +452,12 @@ Return ONLY this JSON structure with no additional text:
 }
 
 Instructions:
-1. Use double quotes for all property names and string values
-2. For the schedule, use ${schedulePeriodType} (${schedulePeriodType === 'days' ? 'Day 1, Day 2' : schedulePeriodType === 'weeks' ? 'Week 1, Week 2' : 'Month 1, Month 2'})
-3. Create a plan for ${currentTimeframe}
-4. All modules need topics with subtopics
-5. Return ONLY valid JSON, no text before or after`;
+1. Create ${timeNumber <= 7 ? '4-5' : timeNumber <= 30 ? '5-8' : '6-10'} modules with progressive complexity
+2. Keep all titles concise (modules: 3-5 words, topics: 2-4 words)
+3. For the schedule, use ${schedulePeriodType} (${schedulePeriodType === 'days' ? 'Day 1, Day 2' : schedulePeriodType === 'weeks' ? 'Week 1, Week 2' : 'Month 1, Month 2'})
+4. Create a plan for ${currentTimeframe}
+5. All modules need topics with subtopics
+6. Return ONLY valid JSON, no text before or after`;
 
       const response = await generateResponse(prompt);
       setRawResponse(response);
@@ -551,16 +554,16 @@ Instructions:
       // Simpler repair prompt
       const repairPrompt = `Fix this JSON to match this structure exactly:
 {
-  "title": "Title",
+  "title": "Short, Concise Title",
   "description": "Description",
   "modules": [
     {
-      "title": "Module title",
+      "title": "Brief Module Title",
       "description": "Description",
       "estimatedTime": "Time",
       "topics": [
         {
-          "title": "Topic",
+          "title": "Short Topic",
           "subtopics": ["Subtopic"],
           "resources": ["Resource"],
           "activities": ["Activity"]
@@ -580,6 +583,7 @@ Instructions:
 Broken JSON:
 ${brokenJson}
 
+Create ${timeNumber <= 7 ? '4-5' : timeNumber <= 30 ? '5-8' : '6-10'} modules with concise titles.
 Return ONLY valid JSON with no explanations.`;
       
       // Send repair request to AI
@@ -1109,7 +1113,7 @@ Return ONLY valid JSON with no explanations.`;
     const [isExpanded, setIsExpanded] = useState(false);
     
     return (
-      <div className="mb-6 bg-gray-800 rounded-lg p-4 border border-gray-700">
+      <div className="mb-6 bg-gray-900 bg-opacity-50 rounded-lg p-4 border border-violet-950">
         <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
           <h3 className="text-lg font-semibold text-white">Module {index + 1}: {module.title}</h3>
           <span className="text-gray-400 text-sm">{module.estimatedTime}</span>
