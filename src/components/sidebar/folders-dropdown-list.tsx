@@ -99,7 +99,7 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
         sticky 
         z-20 
         top-0 
-        bg-black 
+        bg-neutral-950
         w-full  
         h-10 
         group/title 

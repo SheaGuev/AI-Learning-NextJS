@@ -77,7 +77,9 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
     
     const submitPrompt = async () => {
       try {
-        await onSubmit(prompt, textLength, pdfText || undefined);
+        // Add the instruction to prevent markdown code blocks internally
+        const enhancedPrompt = `${prompt}\n\nImportant: Do not wrap your response in markdown code blocks (like \`\`\`markdown ... \`\`\`).`;
+        await onSubmit(enhancedPrompt, textLength, pdfText || undefined);
       } finally {
         setPdfText(null);
       }
@@ -209,7 +211,7 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
         if (prevPrompt.trim()) {
           return `${prevPrompt}\n\nPlease use the content from my uploaded PDF.`;
         } else {
-          return 'Please analyze the content from my uploaded PDF and provide insights.';
+          return 'Please analyse the content from my uploaded PDF and provide a detailed summary in markdown format of its contents. Use proper headings, subheadings, and bullet points to structure the content.';
         }
       });
       
