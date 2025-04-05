@@ -43,6 +43,9 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
   const [showAPIKeyDialog, setShowAPIKeyDialog] = useState(false);
   const [currentRange, setCurrentRange] = useState<any>(null);
   
+  // Add a new state for PDF section processing
+  const [processingPdfSection, setProcessingPdfSection] = useState(false);
+  
   // Basic services
   const supabase = createBClient();
   const { user } = useSupabaseUser();
@@ -109,10 +112,26 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
           break;
       }
       
-      // Combine prompt with length instruction
-      const fullPrompt = lengthInstruction 
-        ? `${prompt}\n\n${lengthInstruction}`
-        : prompt;
+      // Add markdown formatting instructions
+      const markdownInstructions = `
+Format your response using proper Markdown syntax following these guidelines:
+1. Use proper paragraph breaks with a blank line between paragraphs
+2. For bullet lists, use * with a space after it, and place each item on a new line
+3. For numbered lists, use 1. 2. 3. with a space after the period
+4. For nested lists, indent with 2 spaces (not tabs) before the * or number
+5. For code blocks, use triple backticks (\`\`\`) on separate lines before and after the code
+6. For inline code, surround with single backticks (\`)
+7. For headings, use # with a space after it (## for heading 2, ### for heading 3)
+8. For emphasis, use *italic* or **bold** without spaces between the asterisks and text
+9. For blockquotes, use > with a space after it at the start of each line
+10. For tables, follow this format:
+| Column 1 | Column 2 |
+| -------- | -------- |
+| cell 1   | cell 2   |
+`;
+      
+      // Combine prompt with instructions
+      const fullPrompt = `${prompt}\n\n${markdownInstructions}\n\n${lengthInstruction || ''}`;
       
       // Generate text with AI
       const generatedText = await generateText(fullPrompt, contextContent);
@@ -211,7 +230,7 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
   }, [quill]);
   
   // Setup event handlers
-  React.useEffect(() => {
+  useEffect(() => {
     console.log('QuillEditor: Setting up event handlers', { quillInitialized: !!quill });
     if (!quill) return;
     
@@ -997,6 +1016,187 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
       }
     };
     
+    // Add PDF section summary handler
+    const handlePdfSectionSummary = async (e: any) => {
+      const { content } = e.detail;
+      
+      // Check if API key exists
+      if (!apiKeyExists) {
+        setShowAPIKeyDialog(true);
+        return;
+      }
+      
+      console.log('Processing PDF section for summarization');
+      setProcessingPdfSection(true);
+      
+      try {
+        // Use AI to generate a heading and summary for the section
+        const prompt = `Given the following text from a PDF section, please generate a concise heading (6-8 words maximum) 
+        that captures the main topic, and a brief summary (2-3 sentences) that outlines the key points.
+        Format your response as a JSON object with 'heading' and 'summary' properties:
+        {
+          "heading": "The heading for this section",
+          "summary": "A brief 2-3 sentence summary of the key points."
+        }
+        
+        Here is the text section:
+        ${content.substring(0, 2000)}${content.length > 2000 ? '...' : ''}`;
+        
+        const generatedText = await generateText(prompt, '');
+        
+        if (generatedText) {
+          try {
+            // Parse the generated text as JSON
+            let result;
+            
+            // Extract JSON if it's within a code block
+            if (generatedText.includes('```json')) {
+              const jsonMatch = generatedText.match(/```json([\s\S]*?)```/);
+              result = JSON.parse(jsonMatch ? jsonMatch[1].trim() : generatedText);
+            } else if (generatedText.includes('```')) {
+              const jsonMatch = generatedText.match(/```([\s\S]*?)```/);
+              result = JSON.parse(jsonMatch ? jsonMatch[1].trim() : generatedText);
+            } else {
+              // Try to parse the whole response as JSON
+              result = JSON.parse(generatedText);
+            }
+            
+            // Validate the result has heading and summary
+            if (!result.heading || !result.summary) {
+              throw new Error('Invalid response format');
+            }
+            
+            // Create an event with the results
+            const responseEvent = new CustomEvent('ai-section-summary-response', {
+              detail: {
+                heading: result.heading,
+                summary: result.summary
+              },
+              bubbles: true
+            });
+            
+            // Dispatch the event
+            document.dispatchEvent(responseEvent);
+            
+          } catch (error) {
+            console.error('Error parsing AI response for PDF section:', error);
+            
+            // Create a fallback response
+            const words = content.split(/\s+/);
+            const headingWords = words.slice(0, Math.min(8, words.length));
+            let heading = headingWords.join(' ');
+            heading = heading.charAt(0).toUpperCase() + heading.slice(1);
+            
+            const sentences = content.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
+            const summaryText = sentences.slice(0, Math.min(2, sentences.length)).join('. ');
+            const summary = summaryText.trim() + (sentences.length > 2 ? '...' : '.');
+            
+            const responseEvent = new CustomEvent('ai-section-summary-response', {
+              detail: {
+                heading,
+                summary
+              },
+              bubbles: true
+            });
+            
+            document.dispatchEvent(responseEvent);
+          }
+        }
+      } catch (error: any) {
+        console.error('Error generating summary for PDF section:', error);
+        
+        // Create a basic response even on error
+        const words = content.split(/\s+/);
+        const headingWords = words.slice(0, Math.min(8, words.length));
+        let heading = headingWords.join(' ');
+        heading = heading.charAt(0).toUpperCase() + heading.slice(1);
+        
+        const sentences = content.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
+        const summaryText = sentences.slice(0, Math.min(2, sentences.length)).join('. ');
+        const summary = summaryText.trim() + (sentences.length > 2 ? '...' : '.');
+        
+        const responseEvent = new CustomEvent('ai-section-summary-response', {
+          detail: {
+            heading,
+            summary
+          },
+          bubbles: true
+        });
+        
+        document.dispatchEvent(responseEvent);
+      } finally {
+        setProcessingPdfSection(false);
+      }
+    };
+    
+    // Add a handler for PDF content formatting with AI
+    const handlePdfContentFormatting = async (e: any) => {
+      const { content, heading, formattingInstructions } = e.detail;
+      
+      // Check if API key exists
+      if (!apiKeyExists) {
+        setShowAPIKeyDialog(true);
+        return;
+      }
+      
+      console.log('Formatting PDF content for better readability');
+      setProcessingPdfSection(true);
+      
+      try {
+        // Use AI to generate better formatted content
+        const prompt = `You are an expert in document formatting and readability. 
+        Please reformat and restructure the following content extracted from a PDF to make it more readable.
+        The content is about: "${heading}"
+        
+        Transform the raw text into well-structured content with:
+        1. Proper paragraph breaks
+        2. Appropriate bullet points or numbered lists where applicable
+        3. Clear subheadings for different topics (using markdown ### for subheadings)
+        4. Highlight important terms or definitions with emphasis (using *term* or **term**)
+        5. Fix any OCR or formatting issues you notice
+        6. Remove any irrelevant page numbers, headers, or footers
+        
+        Format your response using proper Markdown syntax. DO NOT summarize or change the meaning - 
+        maintain all the original information, just improve the formatting and structure.
+        
+        ${formattingInstructions || ''}
+        
+        Here is the content to reformat:
+        ${content}`;
+        
+        const formattedText = await generateText(prompt, '');
+        
+        if (formattedText) {
+          // Create an event with the results
+          const responseEvent = new CustomEvent('ai-formatted-pdf-content-response', {
+            detail: {
+              formattedContent: formattedText
+            },
+            bubbles: true
+          });
+          
+          // Dispatch the event
+          document.dispatchEvent(responseEvent);
+        } else {
+          throw new Error('Failed to format content');
+        }
+      } catch (error: any) {
+        console.error('Error formatting PDF content:', error);
+        
+        // Create a response with the original content as fallback
+        const responseEvent = new CustomEvent('ai-formatted-pdf-content-response', {
+          detail: {
+            formattedContent: content
+          },
+          bubbles: true
+        });
+        
+        document.dispatchEvent(responseEvent);
+      } finally {
+        setProcessingPdfSection(false);
+      }
+    };
+    
     // Listen for the flashcard AI generation event
     document.addEventListener('flashcard-ai-generate', handleFlashcardAIGenerate);
     
@@ -1008,6 +1208,12 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
     
     // Listen for the PDF upload event for quiz
     document.addEventListener('quiz-pdf-upload', handlePDFToQuiz);
+    
+    // Listen for PDF section summarization requests
+    document.addEventListener('ai-generate-section-summary', handlePdfSectionSummary);
+    
+    // Listen for PDF content formatting requests
+    document.addEventListener('ai-format-pdf-content', handlePdfContentFormatting);
     
     // Direct test for keyboard input
     quill.root.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -1069,6 +1275,7 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
     
     // Global Enter key handler that takes precedence over everything else
     const handleGlobalKeydown = (e: KeyboardEvent) => {
+      // Only handle Enter key, let all other keys (including arrow keys) pass through
       if (e.key === 'Enter') {
         // Check if slash menu is visibly open by looking for the actual DOM element
         const slashMenu = document.querySelector('.ql-slash-commands:not(.hidden)');
@@ -1102,10 +1309,11 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
         }
       }
       
+      // Let all other key events pass through unmodified
       return true;
     };
     
-    // Add with capture phase to ensure it runs before Quill's handlers
+    // Add with capture phase to ensure it runs before Quill's handlers, but ONLY for Enter key
     document.addEventListener('keydown', handleGlobalKeydown, true);
     
     // Cleanup
@@ -1119,11 +1327,13 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
       document.removeEventListener('flashcard-pdf-upload', handlePDFToFlashcard);
       document.removeEventListener('quiz-ai-generate', handleQuizAIGenerate);
       document.removeEventListener('quiz-pdf-upload', handlePDFToQuiz);
+      document.removeEventListener('ai-generate-section-summary', handlePdfSectionSummary);
+      document.removeEventListener('ai-format-pdf-content', handlePdfContentFormatting);
     };
   }, [quill, quillHandler, setupSelectionHandler, generateText, apiKeyExists, toast]);
 
   // Handle document changes from other users
-  React.useEffect(() => {
+  useEffect(() => {
     if (quill === null || socket === null) return;
     const socketHandler = (deltas: any, id: string) => {
       if (id === fileId) {
@@ -1137,7 +1347,7 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
   }, [quill, socket, fileId]);
 
   // Set up collaboration with cursor tracking
-  React.useEffect(() => {
+  useEffect(() => {
     if (!fileId || quill === null) return;
     const room = supabase.channel(fileId);
     const subscription = room
@@ -1192,15 +1402,45 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
   }, [fileId, quill, supabase, user]);
 
   // Add this effect after quill initialization
-  React.useEffect(() => {
+  useEffect(() => {
     if (!quill) return;
     
-    // Only add empty lines if the editor is empty
-    if (quill.getLength() <= 1) { // Quill always has at least 1 character (newline)
-      // Insert 20 empty lines
-      const emptyLines = Array(20).fill('\n').join('');
-      quill.setText(emptyLines);
-    }
+    // Create a function to process markdown on the loaded content
+    const processMarkdown = () => {
+      try {
+        const markdownModule = quill.getModule('markdown');
+        if (markdownModule) {
+          console.log('Triggering markdown processing after content load');
+          
+          // Make sure markdown is enabled
+          if (markdownModule.options) {
+            markdownModule.options.enabled = true;
+          }
+          
+          // Call the process method if available
+          if (typeof markdownModule.process === 'function') {
+            markdownModule.process();
+          }
+          
+          // Also try the activity method
+          if (markdownModule.activity && typeof markdownModule.activity.onTextChange === 'function') {
+            markdownModule.activity.onTextChange();
+          }
+        }
+      } catch (err) {
+        console.error('Error processing markdown after load:', err);
+      }
+    };
+    
+    // Process immediately and also after a delay to ensure content is fully loaded
+    processMarkdown();
+    
+    // Also process after a delay to make sure content is fully loaded and rendered
+    const delayedProcess = setTimeout(() => {
+      processMarkdown();
+    }, 500);
+    
+    return () => clearTimeout(delayedProcess);
   }, [quill]);
 
   // Handle export to markdown
@@ -1223,6 +1463,118 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
     URL.revokeObjectURL(url);
     document.body.removeChild(a);
   };
+
+  // Add empty lines effect
+  useEffect(() => {
+    if (!quill) return;
+    
+    // Only add empty lines if the editor is empty
+    if (quill.getLength() <= 1) { // Quill always has at least 1 character (newline)
+      // Insert 20 empty lines
+      const emptyLines = Array(20).fill('\n').join('');
+      quill.setText(emptyLines);
+    }
+  }, [quill]);
+
+  // Add markdown processing effect
+  useEffect(() => {
+    if (!quill) return;
+    
+    // Create a function to process markdown on the loaded content
+    const processMarkdown = () => {
+      try {
+        // Process markdown if module exists
+        const markdownModule = quill.getModule('markdown');
+        if (markdownModule) {
+          console.log('Triggering markdown processing after content load');
+          
+          // Make sure markdown is enabled
+          if (markdownModule.options) {
+            markdownModule.options.enabled = true;
+          }
+          
+          // Call the process method if available
+          if (typeof markdownModule.process === 'function') {
+            markdownModule.process();
+          }
+          
+          // Also try the activity method
+          if (markdownModule.activity && typeof markdownModule.activity.onTextChange === 'function') {
+            markdownModule.activity.onTextChange();
+          }
+        }
+        
+        // Process tables if the module exists - with error handling
+        try {
+          const tableModule = quill.getModule('markdownTable');
+          if (tableModule && typeof tableModule.detectAndRenderTables === 'function') {
+            console.log('Processing tables in content');
+            tableModule.detectAndRenderTables();
+          }
+        } catch (tableError) {
+          console.error('Error processing tables:', tableError);
+        }
+      } catch (err) {
+        console.error('Error processing markdown after load:', err);
+      }
+    };
+    
+    // Create a debounced version to prevent excessive processing
+    let markdownTimeout: ReturnType<typeof setTimeout>;
+    const debouncedProcessMarkdown = () => {
+      clearTimeout(markdownTimeout);
+      markdownTimeout = setTimeout(processMarkdown, 300);
+    };
+    
+    // Only process once at load time, not twice
+    debouncedProcessMarkdown();
+    
+    // Add an MutationObserver to fix excessive markdown processing
+    const editorElement = quill.root.closest('.ql-container');
+    if (editorElement) {
+      // Track if we're currently processing to prevent recursive calls
+      let isProcessing = false;
+      
+      const observer = new MutationObserver((mutations) => {
+        // Skip if we're already processing to prevent recursive updates
+        if (isProcessing) return;
+        
+        // Check if any mutation is relevant to tables (contains pipe characters)
+        const hasTableMutation = mutations.some(mutation => {
+          if (mutation.type === 'characterData') {
+            return mutation.target.textContent?.includes('|');
+          } else if (mutation.type === 'childList') {
+            return Array.from(mutation.addedNodes).some(node => 
+              (node as HTMLElement).textContent?.includes('|')
+            );
+          }
+          return false;
+        });
+        
+        // Only process if table-related changes detected
+        if (hasTableMutation) {
+          isProcessing = true;
+          debouncedProcessMarkdown();
+          setTimeout(() => {
+            isProcessing = false;
+          }, 400); // Ensure we don't process again too quickly
+        }
+      });
+      
+      observer.observe(editorElement, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+      
+      return () => {
+        clearTimeout(markdownTimeout);
+        observer.disconnect();
+      };
+    }
+    
+    return () => clearTimeout(markdownTimeout);
+  }, [quill]);
 
   return (
     <>

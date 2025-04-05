@@ -8,8 +8,10 @@ import '../styles/slash-commands.css';
 import '../styles/checkbox.css';
 import '../styles/flashcard.css';
 import '../styles/quiz.css';
+import '../styles/markdown-table.css';
 import { initializeCheckboxes } from '../extensions/checkbox-blot';
 // import QuillMarkdown from 'quilljs-markdown';
+import MarkdownTable, { registerMarkdownTable } from '../extensions/markdown-table';
 
 // SVG icons for our menu
 const ICONS = {
@@ -63,6 +65,12 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
           
           // Register custom blocks
           registerCustomBlocks(Quill);
+          
+          // Register markdown table module and get the blot for reference
+          const TableBlot = registerMarkdownTable(Quill);
+          Quill.register('modules/markdownTable', MarkdownTable);
+          // Also register the TableBlot directly with Quill to make sure it's available
+          Quill.register(TableBlot);
           
           console.log('All modules registered successfully');
           
@@ -475,8 +483,57 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
                       }
                     }
                   },
+                  {
+                    label: 'Table',
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-table"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>`,
+                    description: 'Insert a table',
+                    handler: (quill: any, range: any) => {
+                      // Insert a simple 2x2 table template
+                      const tableTemplate = `
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+| Cell 3   | Cell 4   |
+`;
+                      
+                      // Insert a newline first if not at the beginning of a line
+                      const currentPosition = range.index;
+                      const currentText = quill.getText(currentPosition - 1, 1);
+                      
+                      if (currentPosition > 0 && currentText !== '\n') {
+                        quill.insertText(currentPosition, '\n', 'user');
+                        quill.insertText(currentPosition + 1, tableTemplate, 'user');
+                        quill.setSelection(currentPosition + tableTemplate.length + 1, 0);
+                      } else {
+                        quill.insertText(currentPosition, tableTemplate, 'user');
+                        quill.setSelection(currentPosition + tableTemplate.length, 0);
+                      }
+                      
+                      // Process the markdown
+                      try {
+                        const markdownModule = quill.getModule('markdown');
+                        if (markdownModule && typeof markdownModule.process === 'function') {
+                          setTimeout(() => {
+                            markdownModule.process();
+                          }, 100);
+                        }
+                        
+                        // Also process tables
+                        const tableModule = quill.getModule('markdownTable');
+                        if (tableModule && typeof tableModule.detectAndRenderTables === 'function') {
+                          setTimeout(() => {
+                            tableModule.detectAndRenderTables();
+                          }, 200);
+                        }
+                      } catch (err) {
+                        console.error('Error processing markdown for table:', err);
+                      }
+                    }
+                  },
                 ]
-              }
+              },
+              // Add markdown table support
+              markdownTable: {},
             },
             placeholder: 'Start writing or type "/" for commands...',
             formats: [
@@ -484,7 +541,7 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
               'header', 'list', 'blockquote', 'code-block', 
               'hr', 'callout', 'script', 'indent', 'direction', 
               'size', 'color', 'background', 'font', 'align',
-              'checkbox', 'flashcard', 'quiz'  // Add quiz to allowed formats
+              'checkbox', 'flashcard', 'quiz', 'markdown-table'  // Add markdown-table to allowed formats
             ],
           });
           
@@ -492,9 +549,100 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
           const markdownOptions = {
             ignoreTags: ['pre', 'strikethrough'],
             matchVisual: false,
+            // Add support for tables and better list handling
+            tables: true,
+            breaks: true,
+            indentedCodeBlock: true,
+            linkify: true,
+            typographer: true,
+            // Define custom rules if needed
+            customRules: [
+              // Handle indented lists
+              {
+                name: 'indent-list',
+                level: 'block',
+                start(src: string) { return src.match(/^[\s\t]+[-*+]/)?.index || -1; },
+                tokenizer(src: string) {
+                  const match = src.match(/^([\s\t]+)([-*+])\s+(.+)$/);
+                  if (match) {
+                    return {
+                      type: 'indent-list',
+                      raw: match[0],
+                      indent: match[1].length,
+                      content: match[3],
+                      tokens: []
+                    };
+                  }
+                  return undefined;
+                },
+                renderer(token: any) {
+                  // Calculate the list indentation level - each 2 spaces = 1 indent level
+                  const indentLevel = Math.floor(token.indent / 2);
+                  return {
+                    insert: token.content,
+                    attributes: {
+                      list: 'bullet',
+                      indent: indentLevel
+                    }
+                  };
+                }
+              },
+              // Handle indented numbered lists
+              {
+                name: 'indent-numbered-list',
+                level: 'block',
+                start(src: string) { return src.match(/^[\s\t]+\d+\./)?.index || -1; },
+                tokenizer(src: string) {
+                  const match = src.match(/^([\s\t]+)(\d+)\.\s+(.+)$/);
+                  if (match) {
+                    return {
+                      type: 'indent-numbered-list',
+                      raw: match[0],
+                      indent: match[1].length,
+                      number: match[2],
+                      content: match[3],
+                      tokens: []
+                    };
+                  }
+                  return undefined;
+                },
+                renderer(token: any) {
+                  // Calculate the list indentation level - each 2 spaces = 1 indent level
+                  const indentLevel = Math.floor(token.indent / 2);
+                  return {
+                    insert: token.content,
+                    attributes: {
+                      list: 'ordered',
+                      indent: indentLevel
+                    }
+                  };
+                }
+              }
+            ]
           };
           
-          new QuillMarkdown(q, markdownOptions);
+          // Create and initialize the markdown module
+          const markdownModule = new QuillMarkdown(q, markdownOptions);
+          
+          // Store module reference in Quill instance for easy access
+          (q as any).markdownModule = markdownModule;
+          
+          // Force an initial markdown processing pass when content is loaded
+          q.on('editor-change', (eventName: string) => {
+            if (eventName === 'text-change') {
+              // Debounce to avoid excessive processing
+              clearTimeout((q as any).markdownTimeout);
+              (q as any).markdownTimeout = setTimeout(() => {
+                try {
+                  if (markdownModule && typeof markdownModule.process === 'function') {
+                    markdownModule.process();
+                  }
+                } catch (err) {
+                  console.error('Error in markdown processing:', err);
+                }
+              }, 200);
+            }
+          });
           
           // Initialize checkbox support
           initializeCheckboxes(q);

@@ -2,6 +2,7 @@
 import { CheckboxBlot, registerCheckboxBlot } from './checkbox-blot';
 import { FlashcardBlot, registerFlashcardBlot } from './flashcard-blot';
 import { QuizBlot, registerQuizBlot } from './quiz-blot';
+import SlashCommands from './slash-commands';
 
 // We'll need to register these with Quill when we import them
 let Quill: any;
@@ -114,4 +115,7 @@ export function registerCustomBlocks(quillInstance: any) {
   
   // Register quiz blot
   registerQuizBlot(Quill);
+  
+  // Register the slash commands module
+  Quill.register('modules/slashCommands', SlashCommands);
 }
