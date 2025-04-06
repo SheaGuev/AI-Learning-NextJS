@@ -1175,7 +1175,7 @@ export const QuizBlot: QuizBlotStatic = {
         };
         
         // Add count options
-        [3, 5, 7, 10].forEach(count => {
+        [3, 5, 7, 10, 15, 20].forEach(count => {
           optionsButtons.appendChild(createCountButton(count));
         });
         
