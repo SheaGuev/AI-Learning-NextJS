@@ -55,6 +55,7 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
   const [textLength, setTextLength] = useState<TextLengthOption>('medium');
   const [isPdfUploading, setIsPdfUploading] = useState(false);
   const [pdfText, setPdfText] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -69,19 +70,48 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
       setPdfText(null);
       setPrompt('');
       setTextLength('medium'); // Reset to default length
+      setIsSubmitting(false);
     }
   }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isSubmitting) {
+      console.log('AI Dialog: Submit already in progress, preventing duplicate submission');
+      return;
+    }
+    
     const submitPrompt = async () => {
+      setIsSubmitting(true);
+      console.log('AI Dialog: Starting submit process');
+      
       try {
+        // Check if prompt is empty
+        if (!prompt.trim()) {
+          console.error('AI Dialog: Empty prompt submitted');
+          toast({
+            title: 'Empty prompt',
+            description: 'Please enter a prompt before generating text.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        
         // Add the instruction to prevent markdown code blocks internally
         const enhancedPrompt = `${prompt}\n\nImportant: Do not wrap your response in markdown code blocks (like \`\`\`markdown ... \`\`\`).`;
+        console.log('AI Dialog: Submitting enhanced prompt', { promptLength: enhancedPrompt.length });
+        
         await onSubmit(enhancedPrompt, textLength, pdfText || undefined);
+        console.log('AI Dialog: onSubmit completed successfully');
+        // Dialog will be closed by parent component
+      } catch (error) {
+        console.error('AI Dialog: Error in submit process:', error);
+        // Let the parent component handle closing
       } finally {
         setPdfText(null);
+        setIsSubmitting(false);
       }
     };
     
@@ -89,6 +119,7 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
   };
 
   const handleCancel = () => {
+    console.log('AI Dialog: Close or Cancel button clicked');
     setPdfText(null);
     onCancel();
   };
@@ -248,7 +279,8 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
           <button 
             className="ai-prompt-close-btn" 
             onClick={handleCancel}
-            aria-label="Close"
+            aria-label="Close dialog"
+            data-testid="ai-prompt-close-btn"
           >
             ×
           </button>
@@ -326,9 +358,9 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
             <button 
               type="submit" 
               className="ai-prompt-submit-btn"
-              disabled={isPdfUploading || !prompt.trim()}
+              disabled={isPdfUploading || !prompt.trim() || isSubmitting}
             >
-              {isPdfUploading ? 'Processing...' : 'Generate'}
+              {isSubmitting ? 'Generating...' : (isPdfUploading ? 'Processing...' : 'Generate')}
             </button>
           </div>
         </form>

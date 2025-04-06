@@ -230,8 +230,8 @@ const KnowledgeBaseDashboard: React.FC = () => {
           const beforeTagFilter = filtered.length;
           filtered = filtered.filter(item => {
             const itemTags = item.tags as string[] || [];
-            // Item must have ALL selected tags to be included
-            return selectedTags.every(tag => itemTags.includes(tag));
+            // Item must have ANY of the selected tags to be included (OR approach)
+            return selectedTags.some(tag => itemTags.includes(tag));
           });
           console.log(`Tag filtering: reduced from ${beforeTagFilter} to ${filtered.length} items`);
           console.log(`Selected tags: ${selectedTags.join(', ')}`);
