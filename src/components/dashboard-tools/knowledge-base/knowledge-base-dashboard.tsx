@@ -68,6 +68,10 @@ const KnowledgeBaseDashboard: React.FC = () => {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   
+  // Bulk tag management state
+  const [showBulkTagModal, setShowBulkTagModal] = useState(false);
+  const [bulkTagInput, setBulkTagInput] = useState('');
+  
   // Spaced repetition study session state
   const [studyItems, setStudyItems] = useState<KnowledgeItem[]>([]);
   const [showStudySettingsModal, setShowStudySettingsModal] = useState(false);
@@ -1472,6 +1476,12 @@ const KnowledgeBaseDashboard: React.FC = () => {
             </div>
           </div>
         )}
+        
+        {/* Bulk Tag Modal */}
+        {showBulkTagModal && renderBulkTagModal()}
+        
+        {/* Study Settings Modal */}
+        {showStudySettingsModal && renderStudySettingsModal()}
       </>
     );
   };
@@ -1580,6 +1590,181 @@ const KnowledgeBaseDashboard: React.FC = () => {
     }
   };
   
+  // Add bulk tags to selected items
+  const addBulkTags = async () => {
+    if (selectedItems.length === 0 || !bulkTagInput.trim()) return;
+    
+    const tagsToAdd = bulkTagInput
+      .split(',')
+      .map(tag => tag.trim().toLowerCase())
+      .filter(tag => tag !== '');
+      
+    if (tagsToAdd.length === 0) return;
+    
+    setIsLoading(true);
+    
+    try {
+      let successCount = 0;
+      
+      // Process updates sequentially for each selected item
+      for (const itemId of selectedItems) {
+        const item = items.find(i => i.id === itemId);
+        if (!item) continue;
+        
+        // Get current tags
+        const currentTags = (item.tags as string[]) || [];
+        
+        // Add only new tags (avoid duplicates)
+        const updatedTags = [...new Set([...currentTags, ...tagsToAdd])];
+        
+        // Only update if tags were actually added
+        if (updatedTags.length > currentTags.length) {
+          const result = await updateKnowledgeItem(
+            {
+              tags: updatedTags,
+              updatedAt: new Date().toISOString(),
+            },
+            itemId
+          );
+          
+          if (!result.error) {
+            successCount++;
+          }
+        } else {
+          // Still count as success if no new tags were added (just skipped)
+          successCount++;
+        }
+      }
+      
+      // Update local state
+      const updatedItems = items.map(item => {
+        if (selectedItems.includes(item.id)) {
+          const currentTags = (item.tags as string[]) || [];
+          const updatedTags = [...new Set([...currentTags, ...tagsToAdd])];
+          return { 
+            ...item, 
+            tags: updatedTags,
+            updatedAt: new Date().toISOString() 
+          };
+        }
+        return item;
+      });
+      
+      setItems(updatedItems);
+      setFilteredItems(
+        filteredItems.map(item => {
+          if (selectedItems.includes(item.id)) {
+            const currentTags = (item.tags as string[]) || [];
+            const updatedTags = [...new Set([...currentTags, ...tagsToAdd])];
+            return { 
+              ...item, 
+              tags: updatedTags,
+              updatedAt: new Date().toISOString() 
+            };
+          }
+          return item;
+        })
+      );
+      
+      // Update available tags
+      const newAvailableTags = [...new Set([...availableTags, ...tagsToAdd])].sort();
+      setAvailableTags(newAvailableTags);
+      
+      toast({
+        title: 'Tags added',
+        description: `Added tags to ${successCount} items`,
+      });
+      
+      // Clean up
+      setBulkTagInput('');
+      setShowBulkTagModal(false);
+    } catch (error) {
+      console.error('Error adding bulk tags:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add tags to some items',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Render bulk tag modal
+  const renderBulkTagModal = () => {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-[#1e1e2e] rounded-lg p-6 max-w-md w-full">
+          <h3 className="text-xl font-semibold text-white mb-4">Add Tags to {selectedItems.length} Items</h3>
+          
+          <div className="mb-4">
+            <label className="block text-sm text-gray-400 mb-2">
+              Enter tags (comma separated)
+            </label>
+            <textarea
+              className="w-full p-3 bg-[#2d2d3a] text-white rounded border border-[#4A4A67] focus:border-[#6052A8] focus:outline-none"
+              rows={3}
+              value={bulkTagInput}
+              onChange={(e) => setBulkTagInput(e.target.value)}
+              placeholder="tag1, tag2, tag3..."
+              aria-label="Enter tags separated by commas"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Tags will be added to all selected items. Duplicates will be automatically filtered.
+            </p>
+          </div>
+          
+          {availableTags.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-sm text-gray-400 mb-2">Quick add from existing tags</label>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map(tag => (
+                  <button
+                    key={tag}
+                    className="px-2 py-1 text-sm rounded-full bg-[#2d2d3a] text-gray-300 hover:bg-[#3d3d4d]"
+                    onClick={() => {
+                      const currentTags = bulkTagInput
+                        .split(',')
+                        .map(t => t.trim())
+                        .filter(t => t !== '');
+                      
+                      if (!currentTags.includes(tag)) {
+                        const newTagsString = currentTags.length > 0
+                          ? `${bulkTagInput.trim()}, ${tag}`
+                          : tag;
+                        setBulkTagInput(newTagsString);
+                      }
+                    }}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="flex justify-end space-x-3">
+            <button 
+              className="px-4 py-2 bg-[#2d2d3a] text-white rounded hover:bg-[#3d3d4d]"
+              onClick={() => {
+                setShowBulkTagModal(false);
+                setBulkTagInput('');
+              }}
+            >
+              Cancel
+            </button>
+            <button 
+              className="px-4 py-2 bg-[#6052A8] text-white rounded hover:bg-[#7262B8]"
+              onClick={addBulkTags}
+            >
+              Add Tags
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div className="flex flex-col h-full">
       {/* Navigation/Filter Bar */}
@@ -1604,23 +1789,30 @@ const KnowledgeBaseDashboard: React.FC = () => {
                         Delete Selected
                       </button>
                     )}
-                    {filteredItems.length > 0 && (
-                      <div className="flex space-x-2 mr-2">
-                        <button
-                          className="px-3 py-2 bg-[#2d2d3a] text-gray-300 rounded hover:bg-[#3d3d4d] text-sm"
-                          onClick={selectAll}
-                        >
-                          Select All
-                        </button>
-                        {selectedItems.length > 0 && (
-                          <button
-                            className="px-3 py-2 bg-[#2d2d3a] text-gray-300 rounded hover:bg-[#3d3d4d] text-sm"
-                            onClick={deselectAll}
-                          >
-                            Deselect All
-                          </button>
-                        )}
-                      </div>
+                    {selectedItems.length > 0 && (
+                      <button
+                        className="px-4 py-2 bg-[#6052A8] text-white rounded-lg hover:bg-[#7262B8] flex items-center mr-2"
+                        onClick={() => setShowBulkTagModal(true)}
+                      >
+                        <FiTag className="mr-2" />
+                        Add Tags
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex space-x-2 mr-2">
+                    <button
+                      className="px-3 py-2 bg-[#2d2d3a] text-gray-300 rounded hover:bg-[#3d3d4d] text-sm"
+                      onClick={selectAll}
+                    >
+                      Select All
+                    </button>
+                    {selectedItems.length > 0 && (
+                      <button
+                        className="px-3 py-2 bg-[#2d2d3a] text-gray-300 rounded hover:bg-[#3d3d4d] text-sm"
+                        onClick={deselectAll}
+                      >
+                        Deselect All
+                      </button>
                     )}
                   </div>
                   <button
@@ -1759,7 +1951,6 @@ const KnowledgeBaseDashboard: React.FC = () => {
       
       {/* Modals */}
       {renderModals()}
-      {showStudySettingsModal && renderStudySettingsModal()}
     </div>
   );
 };

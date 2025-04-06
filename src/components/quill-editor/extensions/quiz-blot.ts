@@ -1658,7 +1658,7 @@ export const QuizBlot: QuizBlotStatic = {
     // Listen for update events to handle AI-generated content
     node.addEventListener('quiz-update', (e: any) => {
       // Find the closest Quill instance
-      let quillInstance;
+      let quillInstance: any = null;
       try {
         quillInstance = (node.closest('.ql-container') as any)?.['__quill'];
       } catch (err) {
@@ -1768,6 +1768,49 @@ export const QuizBlot: QuizBlotStatic = {
           // Update delete button visibility
           deleteButton.disabled = updatedQuestions.length <= 1;
           deleteButton.style.display = updatedQuestions.length <= 1 ? 'none' : 'flex';
+          
+          // Trigger a save by directly accessing the Quill handler instead of simulating text changes
+          if (quillInstance) {
+            setTimeout(() => {
+              try {
+                // Access the quill handler directly
+                const quillHandlerObj = quillInstance.__quillHandlers && quillInstance.__quillHandlers['text-change'];
+                if (quillHandlerObj && quillHandlerObj.length > 0) {
+                  // Manually trigger the text-change handler with a minimal delta
+                  const minimalDelta = {
+                    ops: [
+                      { retain: quillInstance.getLength() - 1 },
+                      { insert: ' ' },
+                      { delete: 1 }
+                    ]
+                  };
+                  const oldDelta = quillInstance.getContents();
+                  
+                  // Call all attached text-change handlers directly
+                  quillHandlerObj.forEach((handler: Function) => {
+                    try {
+                      handler(minimalDelta, oldDelta, 'user');
+                    } catch (err) {
+                      console.error('Error calling text-change handler:', err);
+                    }
+                  });
+                } else {
+                  // If we can't find the handlers, dispatch a custom event
+                  console.log('Could not access text-change handlers, dispatching custom event');
+                  const saveEvent = new CustomEvent('quiz-save-needed', {
+                    bubbles: true,
+                    detail: { 
+                      quill: quillInstance,
+                      fileId: quillInstance.container?.dataset?.fileId
+                    }
+                  });
+                  document.dispatchEvent(saveEvent);
+                }
+              } catch (err) {
+                console.error('Error triggering save:', err);
+              }
+            }, 500); // Longer timeout to ensure content is fully updated
+          }
         }
       });
     });

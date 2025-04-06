@@ -238,6 +238,45 @@ Format your response using proper Markdown syntax following these guidelines:
     quill.on('text-change', quillHandler);
     console.log('QuillEditor: Text change handler attached');
     
+    // Add handlers for direct save requests from components
+    const handleFlashcardSave = (e: any) => {
+      console.log('Handling flashcard save event');
+      const { quill: componentQuill } = e.detail;
+      
+      // Only handle if this is for our quill instance
+      if (componentQuill === quill) {
+        // Create minimal delta to trigger save
+        const delta = {
+          ops: [{ retain: quill.getLength() - 1 }]
+        };
+        const oldDelta = quill.getContents();
+        
+        // Call the quill handler directly
+        quillHandler(delta, oldDelta, 'user');
+      }
+    };
+    
+    const handleQuizSave = (e: any) => {
+      console.log('Handling quiz save event');
+      const { quill: componentQuill } = e.detail;
+      
+      // Only handle if this is for our quill instance
+      if (componentQuill === quill) {
+        // Create minimal delta to trigger save
+        const delta = {
+          ops: [{ retain: quill.getLength() - 1 }]
+        };
+        const oldDelta = quill.getContents();
+        
+        // Call the quill handler directly
+        quillHandler(delta, oldDelta, 'user');
+      }
+    };
+    
+    // Add event listeners for direct save requests
+    document.addEventListener('flashcard-save-needed', handleFlashcardSave);
+    document.addEventListener('quiz-save-needed', handleQuizSave);
+    
     // Add flashcard AI generation handler
     const handleFlashcardAIGenerate = async (e: any) => {
       const { content, cardCount, flashcardNode } = e.detail;
@@ -329,6 +368,13 @@ Format your response using proper Markdown syntax following these guidelines:
                 toast({
                   title: 'Flashcards generated',
                   description: `Successfully created ${cardData.length} flashcards from your content.`,
+                });
+
+                // Add a reminder to save manually
+                toast({
+                  title: 'Remember to save',
+                  description: 'Click the Save button in the title bar to save your changes.',
+                  duration: 5000,
                 });
               } catch (error) {
                 console.error('Error updating flashcard:', error);
@@ -529,6 +575,13 @@ Format your response using proper Markdown syntax following these guidelines:
                   title: 'Flashcards generated from PDF',
                   description: `Successfully created ${cardData.length} flashcards from your PDF.`,
                 });
+
+                // Add a reminder to save manually
+                toast({
+                  title: 'Remember to save',
+                  description: 'Click the Save button in the title bar to save your changes.',
+                  duration: 5000,
+                });
               }
             } catch (error) {
               console.error('Error parsing AI response:', error, generatedText);
@@ -722,6 +775,13 @@ Format your response using proper Markdown syntax following these guidelines:
                 toast({
                   title: 'Quiz generated',
                   description: `Successfully created ${questionData.length} quiz questions from your content.`,
+                });
+
+                // Add a reminder to save manually
+                toast({
+                  title: 'Remember to save',
+                  description: 'Click the Save button in the title bar to save your changes.',
+                  duration: 5000,
                 });
               } catch (error) {
                 console.error('Error updating quiz:', error);
@@ -971,6 +1031,13 @@ Format your response using proper Markdown syntax following these guidelines:
                 toast({
                   title: 'Quiz generated from PDF',
                   description: `Successfully created ${questionData.length} quiz questions from your PDF.`,
+                });
+
+                // Add a reminder to save manually
+                toast({
+                  title: 'Remember to save',
+                  description: 'Click the Save button in the title bar to save your changes.',
+                  duration: 5000,
                 });
               }
             } catch (error) {
@@ -1329,6 +1396,8 @@ Format your response using proper Markdown syntax following these guidelines:
       document.removeEventListener('quiz-pdf-upload', handlePDFToQuiz);
       document.removeEventListener('ai-generate-section-summary', handlePdfSectionSummary);
       document.removeEventListener('ai-format-pdf-content', handlePdfContentFormatting);
+      document.removeEventListener('flashcard-save-needed', handleFlashcardSave);
+      document.removeEventListener('quiz-save-needed', handleQuizSave);
     };
   }, [quill, quillHandler, setupSelectionHandler, generateText, apiKeyExists, toast]);
 
@@ -1578,7 +1647,7 @@ Format your response using proper Markdown syntax following these guidelines:
 
   return (
     <>
-      <div className="relative">
+      <div className="contents">
         {/* Render trash banner if document is in trash */}
         <TrashBanner 
           dirType={dirType}
@@ -1596,6 +1665,21 @@ Format your response using proper Markdown syntax following these guidelines:
           fileId={fileId || undefined}
           folderId={dirType === 'file' ? dirDetails?.id || undefined : undefined}
           fileContent={quill?.getContents() ? JSON.stringify(quill.getContents()) : undefined}
+          onSave={() => {
+            // Create minimal delta to trigger save
+            if (quill) {
+              const delta = {
+                ops: [{ retain: quill.getLength() - 1 }]
+              };
+              const oldDelta = quill.getContents();
+              quillHandler(delta, oldDelta, 'user');
+              
+              toast({
+                title: 'Saving changes',
+                description: 'Your document is being saved.',
+              });
+            }
+          }}
         />
       </div>
       

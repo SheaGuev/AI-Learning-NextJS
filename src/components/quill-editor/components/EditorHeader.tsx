@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import BreadCrumbs from './BreadCrumbs';
-import { FiDownload, FiLoader, FiPlus, FiDatabase } from 'react-icons/fi';
+import { FiDownload, FiLoader, FiPlus, FiDatabase, FiSave } from 'react-icons/fi';
 import UserAvatars from './UserAvatars';
 import { extractFlashcardsFromDocument, extractQuizzesFromDocument } from '@/lib/knowledge-base';
 import { useSupabaseUser } from '@/lib/providers/supabase-user-provider';
@@ -18,6 +18,7 @@ interface EditorHeaderProps {
   fileId?: string;
   folderId?: string;
   fileContent?: string;
+  onSave?: () => void;
 }
 
 /**
@@ -45,7 +46,8 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   onExportMarkdown,
   fileId,
   folderId,
-  fileContent
+  fileContent,
+  onSave
 }) => {
   const { user } = useSupabaseUser();
   const { toast } = useToast();
@@ -220,7 +222,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-between w-full h-16 px-4 bg-[#0f0f17] border-b border-[#1f1f2d]">
+    <div className="flex items-center justify-between w-full h-16 px-4 bg-[#0f0f17] border-b border-[#1f1f2d] sticky top-0 z-50">
       <div className="flex items-center gap-4">
         {typeof breadCrumbs === 'string' ? (
           <div className="text-sm text-gray-400">{breadCrumbs}</div>
@@ -234,7 +236,18 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
             <FiLoader className="animate-spin" />
             <span>Saving...</span>
           </div>
-        ) : null}
+        ) : (
+          // Save button
+          onSave && (
+            <button
+              onClick={onSave}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-md transition-colors bg-[#1f1f2d] hover:bg-[#3d3d4d] text-gray-300"
+              title="Save Document"
+            >
+              <FiSave className="mr-1" />
+            </button>
+          )
+        )}
         
         {/* Knowledge Base extraction button */}
         <div className="relative group">
@@ -245,7 +258,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
               ${(extracting || !fileContent) ? 'bg-[#3d3d4d] text-gray-400 cursor-not-allowed' : 'bg-[#1f1f2d] hover:bg-[#3d3d4d] text-gray-300'}`}
           >
             {extracting ? <FiLoader className="mr-1 animate-spin" /> : <FiDatabase className="mr-1" />}
-            {extracting ? 'Extracting...' : 'Extract to Knowledge Base'}
+            {extracting ? 'Extracting...' : 'Extract to KB'}
           </button>
           
           <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-[#1f1f2d] text-xs text-gray-300 rounded shadow-lg whitespace-nowrap">
@@ -259,7 +272,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
           className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[#1f1f2d] hover:bg-[#3d3d4d] text-gray-300 rounded-md transition-colors"
         >
           <FiDownload className="mr-1" />
-          Export Markdown
+          Export
         </button>
         
         {/* View Knowledge Base button */}
