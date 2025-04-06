@@ -94,22 +94,29 @@ export const parseMarkdownTable = (text: string): { header: string[], rows: stri
     return null;
   }
   
-  // Parse header row
-  const headerCells = lines[0]
+  // Parse header row - trim outer pipe characters before splitting
+  const headerLine = lines[0].trim();
+  const headerContent = headerLine.startsWith('|') ? headerLine.substring(1) : headerLine;
+  const headerEndContent = headerContent.endsWith('|') ? headerContent.substring(0, headerContent.length - 1) : headerContent;
+  
+  const headerCells = headerEndContent
     .split('|')
-    .filter(cell => cell.trim() !== '')
     .map(cell => cell.trim());
   
   // Skip separator row (line 1)
   
-  // Parse data rows
+  // Parse data rows - trim outer pipe characters before splitting
   const rows = lines.slice(2)
     .filter(line => line.includes('|'))
-    .map(line => 
-      line.split('|')
-        .filter(cell => cell.trim() !== '')
-        .map(cell => cell.trim())
-    );
+    .map(line => {
+      const trimmedLine = line.trim();
+      const content = trimmedLine.startsWith('|') ? trimmedLine.substring(1) : trimmedLine;
+      const endContent = content.endsWith('|') ? content.substring(0, content.length - 1) : content;
+      
+      return endContent
+        .split('|')
+        .map(cell => cell.trim());
+    });
   
   return {
     header: headerCells,
@@ -124,6 +131,7 @@ export default class MarkdownTable {
   timeout: any;
   TableBlot: any;
   processedTables: Set<string>; // Track tables we've already processed
+  lastTableText: string | null = null; // Track the last table text processed
   
   constructor(quill: any, options = {}) {
     this.quill = quill;
@@ -139,7 +147,22 @@ export default class MarkdownTable {
   }
   
   textChangeHandler(delta: any, oldDelta: any, source: string) {
+    // Don't process if not from user or if we're in a programmatic edit
     if (source !== 'user') return;
+    
+    // Check if the delta contains table-related changes (pipe characters)
+    let containsTableChanges = false;
+    if (delta.ops) {
+      for (const op of delta.ops) {
+        if (op.insert && typeof op.insert === 'string' && op.insert.includes('|')) {
+          containsTableChanges = true;
+          break;
+        }
+      }
+    }
+    
+    // Only process if there are table-related changes
+    if (!containsTableChanges) return;
     
     // Debounce to avoid excessive processing
     clearTimeout(this.timeout);
@@ -179,10 +202,37 @@ export default class MarkdownTable {
           }
           this.processedTables.add(tableHash);
           
+          // Check for "runaway" tables with repeated pipe characters
+          // A sign of this is having many more | characters than needed
+          const pipeCount = (tableText.match(/\|/g) || []).length;
+          const lineCount = tableText.split('\n').length;
+          const averagePipesPerLine = pipeCount / lineCount;
+          
+          // If there are too many pipes per line, it's likely a runaway table
+          // A well-formed table should have around (cols + 1) pipes per line
+          if (averagePipesPerLine > 20) { // Arbitrary threshold
+            console.log('Detected runaway table with too many pipes, skipping');
+            continue;
+          }
+          
           // Check if this is already a well-formatted table
           // If it has the exact number of cells in each row, it's probably
           // already been processed
           const tableLines = tableText.split('\n');
+          
+          // Count pipes in each line - this helps detect malformed tables
+          const pipeCounts = tableLines.map((line: string) => 
+            (line.match(/\|/g) || []).length
+          );
+          
+          // If pipe counts are inconsistent or too high, this might be a malformed table
+          const maxPipeCount = Math.max(...pipeCounts);
+          if (maxPipeCount > 20) { // Arbitrary threshold
+            console.log('Detected malformed table with too many pipes, skipping');
+            continue;
+          }
+          
+          // Count cells in each line after splitting by pipes
           const cellCounts = tableLines.map((line: string) => 
             line.split('|').filter((cell: string) => cell.trim() !== '').length
           );
@@ -199,6 +249,18 @@ export default class MarkdownTable {
           // Try to parse the table
           const tableData = parseMarkdownTable(tableText);
           if (tableData) {
+            // Skip empty tables or tables with no data
+            if (tableData.header.length === 0 || tableData.rows.length === 0) {
+              continue;
+            }
+            
+            // Skip if we've processed the exact same table content before
+            if (this.lastTableText === tableText) {
+              console.log('Skipping exact duplicate table processing');
+              continue;
+            }
+            this.lastTableText = tableText;
+            
             // Find the position in the document
             const startIndex = this.findLineIndex(text, i);
             const endIndex = this.findLineIndex(text, endLine);
@@ -251,15 +313,27 @@ export default class MarkdownTable {
       return normalizedRow;
     });
     
-    // Create header row
-    let tableText = '| ' + normalizedHeader.join(' | ') + ' |\n';
+    // Create header row - ensure consistent pipe placement
+    let tableText = '|';
+    for (let col = 0; col < columnCount; col++) {
+      tableText += ` ${normalizedHeader[col]} |`;
+    }
+    tableText += '\n';
     
     // Create separator row
-    tableText += '| ' + normalizedHeader.map(() => '---').join(' | ') + ' |\n';
+    tableText += '|';
+    for (let col = 0; col < columnCount; col++) {
+      tableText += ' --- |';
+    }
+    tableText += '\n';
     
-    // Create data rows
+    // Create data rows - ensure consistent pipe placement
     normalizedRows.forEach(row => {
-      tableText += '| ' + row.join(' | ') + ' |\n';
+      tableText += '|';
+      for (let col = 0; col < columnCount; col++) {
+        tableText += ` ${row[col]} |`;
+      }
+      tableText += '\n';
     });
     
     return tableText;
