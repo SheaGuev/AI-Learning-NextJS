@@ -74,22 +74,54 @@ const SettingsForm = () => {
   const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState({
+    gemini: false,
+    googleSearch: false,
+    searchEngineId: false
+  });
 
-  //WIP PAYMENT PORTAL
+  // Check API key status on mount and when localStorage changes
+  useEffect(() => {
+    const checkApiKeyStatus = () => {
+      setApiKeyStatus({
+        gemini: !!localStorage.getItem('gemini_api_key'),
+        googleSearch: !!localStorage.getItem('google_search_api_key'),
+        searchEngineId: !!localStorage.getItem('google_search_engine_id')
+      });
+    };
+    
+    // Check initially
+    checkApiKeyStatus();
+    
+    // Listen for storage events (changes from other tabs/windows)
+    window.addEventListener('storage', checkApiKeyStatus);
+    
+    return () => {
+      window.removeEventListener('storage', checkApiKeyStatus);
+    };
+  }, []);
 
-//   const redirectToCustomerPortal = async () => {
-//     setLoadingPortal(true);
-//     try {
-//       const { url, error } = await postData({
-//         url: '/api/create-portal-link',
-//       });
-//       window.location.assign(url);
-//     } catch (error) {
-//       console.log(error);
-//       setLoadingPortal(false);
-//     }
-//     setLoadingPortal(false);
-//   };
+  // Handle API key updates
+  const handleApiKeyChange = (key: string, value: string) => {
+    if (value.trim()) {
+      localStorage.setItem(key, value.trim());
+      
+      // Update the API key status
+      setApiKeyStatus(prev => {
+        const newStatus = { ...prev };
+        if (key === 'gemini_api_key') newStatus.gemini = true;
+        if (key === 'google_search_api_key') newStatus.googleSearch = true;
+        if (key === 'google_search_engine_id') newStatus.searchEngineId = true;
+        return newStatus;
+      });
+      
+      toast({
+        title: "API Key Saved",
+        description: `Your ${key.replace(/_/g, ' ').replace(/api key/i, 'API key')} has been saved.`,
+      });
+    }
+  };
+  
   //addcollborators
   const addCollaborator = async (profile: User) => {
     if (!workspaceId) {
@@ -292,6 +324,22 @@ const SettingsForm = () => {
     };
     fetchCollaborators();
   }, [workspaceId]);
+
+  //WIP PAYMENT PORTAL
+
+//   const redirectToCustomerPortal = async () => {
+//     setLoadingPortal(true);
+//     try {
+//       const { url, error } = await postData({
+//         url: '/api/create-portal-link',
+//       });
+//       window.location.assign(url);
+//     } catch (error) {
+//       console.log(error);
+//       setLoadingPortal(false);
+//     }
+//     setLoadingPortal(false);
+//   };
 
   return (
     <div className="flex gap-4 flex-col">
@@ -526,6 +574,152 @@ const SettingsForm = () => {
             <LogOut />
           </div>
         </MdLogout>
+        
+        {/* API Keys Section */}
+        <p className="flex items-center gap-2 mt-6">
+          <Lock size={20} /> API Keys
+        </p>
+        <Separator />
+        <div className="flex flex-col gap-4">
+          <div>
+            <Label
+              htmlFor="geminiApiKey"
+              className="text-sm text-muted-foreground flex items-center gap-2"
+            >
+              Gemini API Key
+              <span className={`inline-block w-2 h-2 rounded-full ${apiKeyStatus.gemini ? 'bg-green-500' : 'bg-red-500'}`} title={apiKeyStatus.gemini ? 'API Key Set' : 'API Key Not Set'}></span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="geminiApiKey"
+                type="password"
+                placeholder="Enter your Gemini API key"
+                defaultValue={localStorage.getItem('gemini_api_key') || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  handleApiKeyChange('gemini_api_key', value);
+                }}
+              />
+              <a 
+                href="https://ai.google.dev/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-blue-500 hover:underline"
+              >
+                Get Key
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Used for AI text generation and content formatting
+            </p>
+          </div>
+          
+          <div>
+            <Label
+              htmlFor="googleSearchApiKey"
+              className="text-sm text-muted-foreground flex items-center gap-2"
+            >
+              Google Search API Key
+              <span className={`inline-block w-2 h-2 rounded-full ${apiKeyStatus.googleSearch ? 'bg-green-500' : 'bg-red-500'}`} title={apiKeyStatus.googleSearch ? 'API Key Set' : 'API Key Not Set'}></span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="googleSearchApiKey"
+                type="password"
+                placeholder="Enter your Google Search API key"
+                defaultValue={localStorage.getItem('google_search_api_key') || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  handleApiKeyChange('google_search_api_key', value);
+                }}
+              />
+              <a 
+                href="https://developers.google.com/custom-search/v1/overview" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-blue-500 hover:underline"
+              >
+                Get Key
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Used for research and web search functionality
+            </p>
+          </div>
+          
+          <div>
+            <Label
+              htmlFor="searchEngineId"
+              className="text-sm text-muted-foreground flex items-center gap-2"
+            >
+              Search Engine ID
+              <span className={`inline-block w-2 h-2 rounded-full ${apiKeyStatus.searchEngineId ? 'bg-green-500' : 'bg-red-500'}`} title={apiKeyStatus.searchEngineId ? 'Search Engine ID Set' : 'Search Engine ID Not Set'}></span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="searchEngineId"
+                type="text"
+                placeholder="Enter your Custom Search Engine ID"
+                defaultValue={localStorage.getItem('google_search_engine_id') || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  handleApiKeyChange('google_search_engine_id', value);
+                }}
+              />
+              <a 
+                href="https://programmablesearchengine.google.com/about/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-blue-500 hover:underline"
+              >
+                Get ID
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Required for Google Custom Search API
+            </p>
+          </div>
+          
+          <div className="mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                // Clear all API keys from localStorage
+                localStorage.removeItem('gemini_api_key');
+                localStorage.removeItem('google_search_api_key');
+                localStorage.removeItem('google_search_engine_id');
+                
+                // Reset the input fields
+                const inputs = document.querySelectorAll('input[id^="gemini"], input[id^="google"], input[id^="search"]');
+                inputs.forEach((input) => {
+                  if (input instanceof HTMLInputElement) {
+                    input.value = '';
+                  }
+                });
+                
+                // Reset the API key status
+                setApiKeyStatus({
+                  gemini: false,
+                  googleSearch: false,
+                  searchEngineId: false
+                });
+                
+                toast({
+                  title: "API Keys Cleared",
+                  description: "All API keys have been removed from your browser.",
+                  variant: "default",
+                });
+              }}
+            >
+              Clear API Keys
+            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              This will remove all API keys from your browser's local storage
+            </p>
+          </div>
+        </div>
+        
         <p className="flex items-center gap-2 mt-6">
           <CreditCard size={20} /> Billing & Plan
         </p>

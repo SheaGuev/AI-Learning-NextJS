@@ -237,6 +237,19 @@ Format your response using proper Markdown syntax following these guidelines:
       // Insert with a small delay to make sure DOM has settled
       setTimeout(() => {
         try {
+          // Check if the editor is still valid
+          if (!quill || !quill.root) {
+            console.error('Quill editor is no longer valid');
+            return;
+          }
+          
+          // Ensure the index is valid
+          const length = quill.getLength();
+          if (index < 0 || index > length) {
+            console.warn(`Invalid insertion index: ${index}, adjusting to valid range`);
+            index = Math.max(0, Math.min(index, length));
+          }
+          
           // Insert the text
           quill.insertText(index, text, 'user');
           
@@ -255,6 +268,28 @@ Format your response using proper Markdown syntax following these guidelines:
           console.log('Text inserted successfully at position', index);
         } catch (error) {
           console.error('Error in delayed text insertion:', error);
+          
+          // Try a fallback insertion method
+          try {
+            console.log('Attempting fallback insertion method');
+            
+            // Get the current selection
+            const range = quill.getSelection();
+            if (range) {
+              // Insert at current selection
+              quill.insertText(range.index, text, 'user');
+              quill.setSelection(range.index + text.length, 0);
+            } else {
+              // Insert at beginning
+              quill.insertText(0, text, 'user');
+              quill.setSelection(text.length, 0);
+            }
+            
+            // Process markdown
+            ContentFormatter.ensureMarkdownProcessed(quill);
+          } catch (fallbackError) {
+            console.error('Fallback insertion also failed:', fallbackError);
+          }
         }
       }, 50);
     } catch (error) {

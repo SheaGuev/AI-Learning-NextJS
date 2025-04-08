@@ -3,11 +3,64 @@ import { Dialog, ProcessedSection } from '../interfaces';
 
 export default class SectionsDialog {
   private static dialog: Dialog | null = null;
+  private static processingQueue: ProcessedSection[] = [];
+  private static isProcessing: boolean = false;
+  private static processingDelay: number = 2000; // 2 second delay between processing sections
+  private static maxConcurrentProcessing: number = 1; // Process one section at a time
+  
+  // Static initializer to set up event listeners
+  static {
+    // Set up the event listener for show-sections-dialog
+    document.addEventListener('show-sections-dialog', (event: any) => {
+      const { quill, sections, range } = event.detail;
+      SectionsDialog.showSectionsDialog(quill, sections, range);
+    });
+    
+    console.log('SectionsDialog event listeners initialized');
+  }
   
   /**
    * Shows a dialog with PDF sections for processing
    */
   static showSectionsDialog(quill: any, sections: string[], range: any): void {
+    // Add a processing state tracker
+    const processingStates = new Map();
+    
+    // Create insert button handler with debounce
+    const handleInsertClick = (section: any, button: HTMLButtonElement) => {
+      // Prevent multiple clicks
+      if (processingStates.get(section)) {
+        console.log('Section already being processed, ignoring click');
+        return;
+      }
+      
+      // Mark section as processing
+      processingStates.set(section, true);
+      button.disabled = true;
+      button.textContent = 'Inserting...';
+      
+      // Dispatch insert event
+      const event = new CustomEvent('pdf-insert-with-summary', {
+        detail: {
+          heading: section.heading,
+          summary: section.summary,
+          content: section.content,
+          range,
+          quill
+        },
+        bubbles: true
+      });
+      
+      document.dispatchEvent(event);
+      
+      // Clean up after processing (whether successful or not)
+      setTimeout(() => {
+        processingStates.delete(section);
+        button.disabled = false;
+        button.textContent = 'Insert Section';
+      }, 5000); // Reset after 5 seconds in case of failure
+    };
+    
     // Create dialog container
     const dialog = document.createElement('div');
     dialog.className = 'pdf-sections-dialog';
@@ -93,45 +146,28 @@ export default class SectionsDialog {
     selectAllContainer.appendChild(selectAllCheckbox);
     selectAllContainer.appendChild(selectAllLabel);
     
-    // Enhanced formatting toggle
-    const enhancedFormatContainer = document.createElement('div');
-    enhancedFormatContainer.style.display = 'flex';
-    enhancedFormatContainer.style.alignItems = 'center';
-    
-    const enhancedFormatCheckbox = document.createElement('input');
-    enhancedFormatCheckbox.type = 'checkbox';
-    enhancedFormatCheckbox.id = 'enhanced-format';
-    enhancedFormatCheckbox.className = 'pdf-section-checkbox';
-    enhancedFormatCheckbox.style.marginRight = '8px';
-    enhancedFormatCheckbox.checked = true; // Enable by default
-    
-    const enhancedFormatLabel = document.createElement('label');
-    enhancedFormatLabel.htmlFor = 'enhanced-format';
-    enhancedFormatLabel.textContent = 'Enhanced Formatting';
-    enhancedFormatLabel.style.color = '#fff';
-    enhancedFormatLabel.style.cursor = 'pointer';
-    
-    // Add tooltip or info icon
-    const infoIcon = document.createElement('span');
-    infoIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
-    infoIcon.style.marginLeft = '4px';
-    infoIcon.style.color = '#0ea5e9';
-    infoIcon.style.cursor = 'help';
-    infoIcon.title = 'Use AI to improve readability and formatting (takes longer but produces better results)';
-    
-    enhancedFormatContainer.appendChild(enhancedFormatCheckbox);
-    enhancedFormatContainer.appendChild(enhancedFormatLabel);
-    enhancedFormatContainer.appendChild(infoIcon);
+    // Status indicator
+    const statusIndicator = document.createElement('div');
+    statusIndicator.id = 'pdf-processing-status';
+    statusIndicator.style.color = '#999';
+    statusIndicator.textContent = 'Ready to process sections';
     
     // Add elements to left controls
     leftControls.appendChild(selectAllContainer);
-    leftControls.appendChild(enhancedFormatContainer);
+    leftControls.appendChild(statusIndicator);
     
     // Insert All button
     const insertAllBtn = document.createElement('button');
-    insertAllBtn.textContent = 'Insert All Selected';
+    insertAllBtn.textContent = 'Insert Selected';
     insertAllBtn.className = 'pdf-section-button primary';
-    insertAllBtn.disabled = true; // Disabled until sections are loaded
+    insertAllBtn.style.backgroundColor = '#6d28d9';
+    insertAllBtn.style.color = '#fff';
+    insertAllBtn.style.border = 'none';
+    insertAllBtn.style.borderRadius = '4px';
+    insertAllBtn.style.padding = '8px 16px';
+    insertAllBtn.style.cursor = 'pointer';
+    insertAllBtn.style.fontSize = '14px';
+    insertAllBtn.disabled = true; // Disabled until sections are processed
     
     // Add them to controls bar
     controlsBar.appendChild(leftControls);
@@ -191,7 +227,7 @@ export default class SectionsDialog {
       
       // Loading indicator
       const loadingIndicator = document.createElement('span');
-      loadingIndicator.textContent = 'Analyzing...';
+      loadingIndicator.textContent = 'Waiting...';
       loadingIndicator.className = 'pdf-loading-indicator';
       loadingIndicator.style.color = '#999';
       
@@ -233,8 +269,9 @@ export default class SectionsDialog {
       buttonsContainer.style.justifyContent = 'flex-end';
       buttonsContainer.style.gap = '8px';
       
+      // Single Insert button
       const insertBtn = document.createElement('button');
-      insertBtn.textContent = 'Insert Content';
+      insertBtn.textContent = 'Insert Section';
       insertBtn.className = 'pdf-section-button';
       insertBtn.style.backgroundColor = '#4b5563';
       insertBtn.style.color = '#fff';
@@ -243,50 +280,39 @@ export default class SectionsDialog {
       insertBtn.style.padding = '8px 12px';
       insertBtn.style.cursor = 'pointer';
       insertBtn.style.fontSize = '14px';
+      insertBtn.disabled = true; // Disabled until processed
       
-      const insertWithSummaryBtn = document.createElement('button');
-      insertWithSummaryBtn.textContent = 'Insert with Summary';
-      insertWithSummaryBtn.className = 'pdf-section-button primary';
-      insertWithSummaryBtn.style.backgroundColor = '#6d28d9';
-      insertWithSummaryBtn.style.color = '#fff';
-      insertWithSummaryBtn.style.border = 'none';
-      insertWithSummaryBtn.style.borderRadius = '4px';
-      insertWithSummaryBtn.style.padding = '8px 12px';
-      insertWithSummaryBtn.style.cursor = 'pointer';
-      insertWithSummaryBtn.style.fontSize = '14px';
-      
-      // Disable buttons until analysis is complete
-      insertBtn.disabled = true;
-      insertWithSummaryBtn.disabled = true;
-      
+      // Add buttons to container
       buttonsContainer.appendChild(insertBtn);
-      buttonsContainer.appendChild(insertWithSummaryBtn);
       
-      // Assemble section
+      // Add elements to the section
       sectionEl.appendChild(sectionHeader);
       sectionEl.appendChild(contentContainer);
       sectionEl.appendChild(buttonsContainer);
       
+      // Add to sections container
       sectionsContainer.appendChild(sectionEl);
       
-      // Store section information for later processing
-      processedSections.push({
-        element: sectionEl,
-        contentContainer,
-        loadingIndicator,
-        insertBtn,
-        insertWithSummaryBtn,
-        checkbox,
+      // Create processed section object and add to array
+      const processedSection: ProcessedSection = {
         content: section,
+        element: sectionEl,
         heading: '',
         summary: '',
-        selected: false
-      });
+        selected: false,
+        checkbox,
+        loadingIndicator,
+        contentContainer,
+        insertBtn,
+        insertWithSummaryBtn: insertBtn // For compatibility
+      };
+      
+      processedSections.push(processedSection);
     }
     
     dialog.appendChild(sectionsContainer);
     
-    // Create overlay
+    // Create overlay background
     const overlay = document.createElement('div');
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -295,7 +321,6 @@ export default class SectionsDialog {
     overlay.style.height = '100%';
     overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
     overlay.style.zIndex = '1999';
-    overlay.setAttribute('data-start-time', new Date().getTime().toString());
     
     // Add to DOM
     document.body.appendChild(overlay);
@@ -312,20 +337,34 @@ export default class SectionsDialog {
       });
       
       // Update insert all button state
-      insertAllBtn.disabled = !isChecked;
+      insertAllBtn.disabled = !isChecked && processedSections.every(s => !s.selected);
     });
     
     // Handle insert all button
     insertAllBtn.addEventListener('click', () => {
-      const selectedSections = processedSections.filter(s => s.selected);
+      const selectedSections = processedSections.filter(s => s.selected && s.heading);
       if (selectedSections.length === 0) return;
       
-      // Dispatch custom event instead of calling PdfProcessor directly
-      const event = new CustomEvent('pdf-insert-sections', {
+      // Build combined content
+      let combinedContent = '';
+      
+      // Insert each section with heading and summary
+      selectedSections.forEach((section, index) => {
+        const formattedContent = `## ${section.heading}\n\n*${section.summary}*\n\n${section.content}\n\n`;
+        combinedContent += formattedContent;
+        
+        // Add a separator between sections (except for the last one)
+        if (index < selectedSections.length - 1) {
+          combinedContent += '\n\n---\n\n';
+        }
+      });
+      
+      // Dispatch event to insert content
+      const event = new CustomEvent('pdf-insert-content', {
         detail: {
-          sections: selectedSections,
+          content: combinedContent,
           range,
-          enhanced: enhancedFormatCheckbox.checked
+          quill
         }
       });
       document.dispatchEvent(event);
@@ -334,22 +373,14 @@ export default class SectionsDialog {
       SectionsDialog.closeSectionsDialog();
     });
     
-    // Start processing sections with AI
-    const processSections = () => {
-      // Dispatch event instead of calling PdfProcessor directly
-      const event = new CustomEvent('pdf-process-sections', {
-        detail: {
-          sections: processedSections,
-          range,
-          insertAllBtn,
-          selectAllCheckbox
-        }
-      });
-      document.dispatchEvent(event);
-    };
+    // Setup the processing queue to process one section at a time
+    SectionsDialog.processingQueue = [...processedSections];
+    SectionsDialog.isProcessing = false;
     
-    // Start processing sections with AI after a short delay
-    setTimeout(processSections, 100);
+    // Start processing sections sequentially
+    setTimeout(() => {
+      SectionsDialog.processNextSection(quill, range);
+    }, 100);
     
     // Set dialog property for outside click handling
     SectionsDialog.dialog = {
@@ -369,6 +400,102 @@ export default class SectionsDialog {
     
     // Add document click handler to close dialog when clicking outside
     document.addEventListener('click', SectionsDialog.handleOutsideClick);
+  }
+  
+  /**
+   * Process the next section in the queue
+   */
+  static processNextSection(quill: any, range: any): void {
+    // If already processing or queue is empty, return
+    if (SectionsDialog.isProcessing || SectionsDialog.processingQueue.length === 0) {
+      // If we've completed all processing, update status
+      if (SectionsDialog.processingQueue.length === 0) {
+        const statusEl = document.getElementById('pdf-processing-status');
+        if (statusEl) {
+          statusEl.textContent = 'All sections processed';
+          statusEl.style.color = '#4ade80';
+        }
+      }
+      return;
+    }
+    
+    // Mark as processing
+    SectionsDialog.isProcessing = true;
+    
+    // Get the status indicator
+    const statusEl = document.getElementById('pdf-processing-status');
+    if (statusEl) {
+      statusEl.textContent = `Processing: ${SectionsDialog.processingQueue.length} sections remaining`;
+    }
+    
+    // Get the next section
+    const section = SectionsDialog.processingQueue.shift();
+    if (!section) {
+      SectionsDialog.isProcessing = false;
+      return;
+    }
+    
+    // Update loading status
+    section.loadingIndicator.textContent = 'Processing...';
+    
+    // Dispatch event for AI processing
+    const event = new CustomEvent('pdf-process-section', {
+      detail: {
+        section,
+        quill,
+        range,
+        onComplete: () => {
+          // Once processing is complete, enable the button
+          section.insertBtn.disabled = false;
+          
+          // Add click handlers for button
+          section.insertBtn.onclick = () => {
+            const event = new CustomEvent('pdf-insert-with-summary', {
+              detail: {
+                heading: section.heading,
+                summary: section.summary,
+                content: section.content,
+                range,
+                quill
+              }
+            });
+            document.dispatchEvent(event);
+            SectionsDialog.closeSectionsDialog();
+          };
+          
+          // Add checkbox change handler
+          section.checkbox.addEventListener('change', () => {
+            section.selected = section.checkbox.checked;
+            
+            // Get all sections (not just processed ones)
+            const allCheckboxes = document.querySelectorAll('.pdf-section-checkbox');
+            const allSections = Array.from(document.querySelectorAll('.pdf-section-card')).length - 1; // Minus the header
+            
+            // Update insert all button state
+            const insertAllBtn = document.querySelector('.pdf-section-button.primary') as HTMLButtonElement;
+            if (insertAllBtn) {
+              const anySelected = Array.from(allCheckboxes).some(cb => (cb as HTMLInputElement).checked);
+              insertAllBtn.disabled = !anySelected;
+            }
+            
+            // Update select all checkbox
+            const selectAllCheckbox = document.getElementById('select-all-sections') as HTMLInputElement;
+            if (selectAllCheckbox) {
+              const checkedCount = Array.from(allCheckboxes).filter(cb => (cb as HTMLInputElement).checked).length - 1; // Minus the "select all" checkbox
+              selectAllCheckbox.checked = checkedCount === allSections;
+              selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < allSections;
+            }
+          });
+          
+          // Process the next section after a delay to prevent rate limiting
+          setTimeout(() => {
+            SectionsDialog.isProcessing = false;
+            SectionsDialog.processNextSection(quill, range);
+          }, SectionsDialog.processingDelay);
+        }
+      }
+    });
+    document.dispatchEvent(event);
   }
   
   /**
