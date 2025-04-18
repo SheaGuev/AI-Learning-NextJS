@@ -17,39 +17,39 @@ export default class SlashCommands {
     this.quill = quill;
     this.options = options;
     
-    // Ensure AI generate command is available
-    if (this.options.commands) {
-      // Check if AI generate command already exists
-      const hasAiCommand = this.options.commands.some((cmd: CommandOption) => 
-        cmd.label.toLowerCase().includes('ai') || 
-        cmd.label.toLowerCase().includes('generate')
-      );
+    // // Ensure AI generate command is available
+    // if (this.options.commands) {
+    //   // Check if AI generate command already exists
+    //   const hasAiCommand = this.options.commands.some((cmd: CommandOption) => 
+    //     cmd.label.toLowerCase().includes('ai') || 
+    //     cmd.label.toLowerCase().includes('generate')
+    //   );
       
-      // If no AI command exists, add it
-      if (!hasAiCommand) {
-        console.log('Adding AI generate command to options');
-        this.options.commands.push({
-          label: 'AI Generate',
-          icon: '✨',
-          description: 'Generate content using AI',
-          handler: (quill: any, range: any) => {
-            console.log('AI Generate command executed', { range });
+    //   // If no AI command exists, add it
+    //   if (!hasAiCommand) {
+    //     console.log('Adding AI generate command to options');
+    //     this.options.commands.push({
+    //       label: 'AI Generate',
+    //       icon: '✨',
+    //       description: 'Generate content using AI',
+    //       handler: (quill: any, range: any) => {
+    //         console.log('AI Generate command executed', { range });
             
-            // Ensure we have a valid range
-            if (!range) {
-              console.warn('No range provided for AI generate command');
-              range = { index: quill.getLength() - 1, length: 0 };
-            }
+    //         // Ensure we have a valid range
+    //         if (!range) {
+    //           console.warn('No range provided for AI generate command');
+    //           range = { index: quill.getLength() - 1, length: 0 };
+    //         }
             
-            // Dispatch AI generate event
-            const event = new CustomEvent('ai-generate', {
-              detail: { quill, range }
-            });
-            document.dispatchEvent(event);
-          }
-        });
-      }
-    }
+    //         // Dispatch AI generate event
+    //         const event = new CustomEvent('ai-generate', {
+    //           detail: { quill, range }
+    //         });
+    //         document.dispatchEvent(event);
+    //       }
+    //     });
+    //   }
+    // }
     
     // Create container for the menu
     this.container = document.createElement('div');

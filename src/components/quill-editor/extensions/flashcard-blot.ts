@@ -5,16 +5,22 @@ interface FlashcardBlotStatic {
   blotName: string;
   tagName: string;
   className: string;
-  create: (value: any) => HTMLElement;
+  create: (value: any, quillInstance?: any) => HTMLElement;
   value: (node: HTMLElement) => { cards: { front: string; back: string }[]; currentIndex: number; isFlipped: boolean };
 }
 
 // Utility function to temporarily disable markdown processing
 const withDisabledMarkdown = (quill: any, callback: () => void) => {
+  // Check if quill instance is provided
+  if (!quill) {
+    console.warn('withDisabledMarkdown called without Quill instance, executing callback directly.');
+    callback();
+    return;
+  }
   try {
-    // Find the root Quill instance if we have a blot
-    const quillInstance = quill.quill || quill;
-    
+    // Find the root Quill instance if we have a blot or module context
+    const quillInstance = quill.quill || quill; // Use the passed instance
+
     // Temporarily disable markdown module to prevent error during update
     const markdownModule = quillInstance.getModule && quillInstance.getModule('markdown');
     const originalProcessorEnabled = markdownModule?.options?.enabled;
@@ -44,7 +50,7 @@ export const FlashcardBlot: FlashcardBlotStatic = {
   tagName: 'div',
   className: 'ql-flashcard',
   
-  create(value: { cards?: { front: string; back: string }[]; currentIndex?: number; isFlipped?: boolean } = {}) {
+  create(value: { cards?: { front: string; back: string }[]; currentIndex?: number; isFlipped?: boolean } = {}, quillInstance?: any) {
     const node = document.createElement('div');
     node.setAttribute('class', 'ql-flashcard');
     node.setAttribute('contenteditable', 'false');
@@ -336,16 +342,18 @@ export const FlashcardBlot: FlashcardBlotStatic = {
       e.preventDefault();
       e.stopPropagation();
       
-      // Find the closest Quill instance
-      let quillInstance;
-      try {
-        quillInstance = (node.closest('.ql-container') as any)?.['__quill'];
-      } catch (err) {
-        // Ignore errors here
+      // Find the closest Quill instance - use the passed one if available
+      let currentQuillInstance = quillInstance;
+      if (!currentQuillInstance) {
+        try {
+          currentQuillInstance = (node.closest('.ql-container') as any)?.['__quill'];
+        } catch (err) {
+          // Ignore errors here
+        }
       }
-      
+
       // Wrap the add operation in markdown safety
-      withDisabledMarkdown(quillInstance || Quill, () => {
+      withDisabledMarkdown(currentQuillInstance, () => { // Pass the resolved quill instance
         // Get current total cards
         const totalCards = parseInt(container.dataset.totalCards || '1');
         const newIndex = totalCards;
@@ -467,16 +475,18 @@ export const FlashcardBlot: FlashcardBlotStatic = {
       e.preventDefault();
       e.stopPropagation();
       
-      // Find the closest Quill instance
-      let quillInstance;
-      try {
-        quillInstance = (node.closest('.ql-container') as any)?.['__quill'];
-      } catch (err) {
-        // Ignore errors here
+      // Find the closest Quill instance - use the passed one if available
+      let currentQuillInstance = quillInstance;
+      if (!currentQuillInstance) {
+        try {
+          currentQuillInstance = (node.closest('.ql-container') as any)?.['__quill'];
+        } catch (err) {
+          // Ignore errors here
+        }
       }
-      
+
       // Wrap the delete operation in markdown safety
-      withDisabledMarkdown(quillInstance || Quill, () => {
+      withDisabledMarkdown(currentQuillInstance, () => { // Pass the resolved quill instance
         // Get current index and total cards
         const currentIdx = parseInt(container.dataset.currentIndex || '0');
         const totalCards = parseInt(container.dataset.totalCards || '1');
@@ -1151,16 +1161,18 @@ export const FlashcardBlot: FlashcardBlotStatic = {
     
     // Listen for update events to handle AI-generated content
     node.addEventListener('flashcard-update', (e: any) => {
-      // Find the closest Quill instance
-      let quillInstance: any = null;
-      try {
-        quillInstance = (node.closest('.ql-container') as any)?.['__quill'];
-      } catch (err) {
-        // Ignore errors here
+      // Find the closest Quill instance - use the passed one if available
+      let currentQuillInstance = quillInstance;
+      if (!currentQuillInstance) {
+        try {
+          currentQuillInstance = (node.closest('.ql-container') as any)?.['__quill'];
+        } catch (err) {
+          // Ignore errors here
+        }
       }
       
       // Wrap the update operation in markdown safety
-      withDisabledMarkdown(quillInstance || Quill, () => {
+      withDisabledMarkdown(currentQuillInstance, () => { // Pass the resolved quill instance
         const newValue = e.detail;
         
         // Update cards with new content
@@ -1341,21 +1353,21 @@ export const FlashcardBlot: FlashcardBlotStatic = {
           deleteButton.style.display = updatedCards.length <= 1 ? 'none' : 'flex';
           
           // Trigger a save by directly accessing the Quill handler instead of simulating text changes
-          if (quillInstance) {
+          if (currentQuillInstance) {
             setTimeout(() => {
               try {
                 // Access the quill handler directly
-                const quillHandlerObj = quillInstance.__quillHandlers && quillInstance.__quillHandlers['text-change'];
+                const quillHandlerObj = currentQuillInstance.__quillHandlers && currentQuillInstance.__quillHandlers['text-change'];
                 if (quillHandlerObj && quillHandlerObj.length > 0) {
                   // Manually trigger the text-change handler with a minimal delta
                   const minimalDelta = {
                     ops: [
-                      { retain: quillInstance.getLength() - 1 },
+                      { retain: currentQuillInstance.getLength() - 1 },
                       { insert: ' ' },
                       { delete: 1 }
                     ]
                   };
-                  const oldDelta = quillInstance.getContents();
+                  const oldDelta = currentQuillInstance.getContents();
                   
                   // Call all attached text-change handlers directly
                   quillHandlerObj.forEach((handler: Function) => {
@@ -1371,8 +1383,8 @@ export const FlashcardBlot: FlashcardBlotStatic = {
                   const saveEvent = new CustomEvent('flashcard-save-needed', {
                     bubbles: true,
                     detail: { 
-                      quill: quillInstance,
-                      fileId: quillInstance.container?.dataset?.fileId
+                      quill: currentQuillInstance,
+                      fileId: currentQuillInstance.container?.dataset?.fileId
                     }
                   });
                   document.dispatchEvent(saveEvent);
@@ -1428,26 +1440,47 @@ export const FlashcardBlot: FlashcardBlotStatic = {
 
 // Export initialization function
 export function registerFlashcardBlot(quillInstance: any) {
-  Quill = quillInstance;
-  
-  const BlockEmbed = Quill.import('blots/block/embed');
-  
-  // Create a class that extends BlockEmbed
+  // Ensure quillInstance is valid
+  if (!quillInstance || typeof quillInstance.import !== 'function') {
+    console.error('Invalid Quill instance passed to registerFlashcardBlot');
+    return;
+  }
+
+  // Import BlockEmbed using the provided Quill instance
+  const BlockEmbed = quillInstance.import('blots/block/embed');
+
+  // Check if BlockEmbed was imported successfully
+  if (!BlockEmbed) {
+      console.error('Failed to import BlockEmbed from Quill instance.');
+      return;
+  }
+
+  // Define the Blot class *inside* the registration function
+  // extending the correct BlockEmbed
   class FlashcardBlotClass extends BlockEmbed {
-    static create(value: { cards?: { front: string; back: string }[]; currentIndex?: number; isFlipped?: boolean }) {
-      return FlashcardBlot.create(value);
+    static create(value: any) {
+      // Call the original create function, passing the quill instance
+      return FlashcardBlot.create(value, quillInstance);
     }
-    
+
     static value(node: HTMLElement) {
+      // Call the original value function
       return FlashcardBlot.value(node);
     }
+
+    // Quill requires formats static method for block embeds if interacting with formats API
+    static formats(domNode: HTMLElement) {
+       // Return any format information if needed, often matches value structure
+       return FlashcardBlot.value(domNode);
+    }
   }
-  
-  // Set properties on the class
+
+  // Assign static properties
   FlashcardBlotClass.blotName = FlashcardBlot.blotName;
   FlashcardBlotClass.tagName = FlashcardBlot.tagName;
   FlashcardBlotClass.className = FlashcardBlot.className;
-  
-  // Register with Quill
-  Quill.register(FlashcardBlotClass);
+
+  // Register the class with Quill
+  quillInstance.register(FlashcardBlotClass);
+  console.log(`Flashcard Blot "${FlashcardBlotClass.blotName}" registered successfully.`); // Confirmation log
 } 

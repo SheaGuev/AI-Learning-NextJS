@@ -1,6 +1,6 @@
 // Custom block formats for Quill
 import { CheckboxBlot, registerCheckboxBlot } from './checkbox-blot';
-// import { FlashcardBlot, registerFlashcardBlot } from './flashcard-blot'; // Commented out
+import { FlashcardBlot, registerFlashcardBlot } from './flashcard-blot';
 import { QuizBlot, registerQuizBlot } from './quiz-blot'; // Removed .ts extension
 import SlashCommands from '../commands/slash-commands'; // Removed .ts extension
 
@@ -111,7 +111,7 @@ export function registerCustomBlocks(quillInstance: any) {
   registerCheckboxBlot(Quill);
   
   // Register flashcard blot
-  // registerFlashcardBlot(Quill); // Commented out
+  registerFlashcardBlot(Quill);
   
   // Register quiz blot
   registerQuizBlot(Quill);
