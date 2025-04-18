@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import '../styles/ai-dialog.css';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
+import { usePDFExtractor } from '@/lib/hooks/use-pdf-extractor';
 
 // Define text length options
 export type TextLengthOption = 'short' | 'medium' | 'long' | 'verylong' | 'custom';
@@ -46,7 +47,7 @@ interface AIPromptDialogProps {
   isOpen: boolean;
 }
 
-const AIPromptDialog: React.FC<AIPromptDialogProps> = ({ 
+export const AIPromptDialog: React.FC<AIPromptDialogProps> = ({ 
   onSubmit, 
   onCancel,
   isOpen 
@@ -59,6 +60,7 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { extractFullText } = usePDFExtractor();
 
   useEffect(() => {
     if (isOpen) {
@@ -124,106 +126,13 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
     onCancel();
   };
 
-  const extractTextFromPdf = async (arrayBuffer: ArrayBuffer): Promise<string> => {
-    try {
-      // Dynamically load PDF.js if not already loaded
-      if (!window.pdfjsLib) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error('Failed to load PDF.js'));
-          document.head.appendChild(script);
-        });
-      }
-
-      // Load the PDF document
-      if (!window.pdfjsLib) {
-        throw new Error('PDF.js library failed to load properly');
-      }
-
-      const loadingTask = window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-      const pdf = await loadingTask.promise;
-      
-      let extractedText = '';
-      
-      // Process each page
-      for (let i = 1; i <= pdf.numPages; i++) {
-        if (pdf.numPages > 5 && i % 5 === 0) {
-          toast({
-            title: 'PDF Processing',
-            description: `Extracting page ${i} of ${pdf.numPages}...`,
-          });
-        }
-        
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        
-        // Concatenate text items with proper spacing
-        const pageText = textContent.items
-          .map((item: any) => {
-            if ('str' in item) {
-              return item.str;
-            }
-            return '';
-          })
-          .join(' ');
-        
-        extractedText += pageText + '\n\n';
-      }
-      
-      // Trim the extracted text to avoid exceeding token limits
-      const maxLength = 15000; // Adjust based on model's limits
-      if (extractedText.length > maxLength) {
-        extractedText = extractedText.substring(0, maxLength) + '...';
-        toast({
-          title: 'PDF content truncated',
-          description: 'The PDF was too large and has been truncated for processing.',
-        });
-      }
-      
-      toast({
-        title: 'PDF Processed',
-        description: `Successfully extracted text from ${pdf.numPages} page${pdf.numPages !== 1 ? 's' : ''}.`,
-      });
-      
-      return extractedText;
-    } catch (error: any) {
-      console.error('Error extracting text from PDF:', error);
-      
-      // Provide specific error messages
-      if (error.message && error.message.includes('worker')) {
-        throw new Error('PDF worker failed to load. Please try refreshing the page.');
-      } else if (error.message && error.message.includes('password')) {
-        throw new Error('The PDF is password protected. Please remove the password and try again.');
-      } else if (error.name === 'InvalidPDFException') {
-        throw new Error('The PDF file is invalid or corrupted. Please try another file.');
-      } else {
-        throw new Error('Failed to extract text from PDF. Please try entering your prompt manually.');
-      }
-    }
-  };
-
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      setIsPdfUploading(true);
-      
-      // Validate file type
-      if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
-        toast({
-          title: 'Invalid File',
-          description: 'Please upload a PDF file.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      
       // Extract text from PDF
-      const arrayBuffer = await file.arrayBuffer();
-      const extractedText = await extractTextFromPdf(arrayBuffer);
+      const extractedText = await extractFullText(file);
       
       if (extractedText.trim().length === 0) {
         toast({
@@ -233,32 +142,23 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
         });
         return;
       }
-      
-      // Set the extracted text in state
-      setPdfText(extractedText);
-      
-      // Update the prompt to include info about the PDF
-      setPrompt((prevPrompt) => {
-        if (prevPrompt.trim()) {
-          return `${prevPrompt}\n\nPlease use the content from my uploaded PDF.`;
-        } else {
-          return 'Please analyse the content from my uploaded PDF and provide a detailed summary in markdown format of its contents. Use proper headings, subheadings, and bullet points to structure the content.';
-        }
-      });
+
+      // Set the extracted text as the prompt
+      setPrompt(extractedText);
       
       toast({
-        title: 'PDF Uploaded',
-        description: 'PDF content has been extracted and will be included with your prompt.',
+        title: 'PDF Processed',
+        description: 'Text has been extracted from the PDF and added to your prompt.',
       });
     } catch (error: any) {
       console.error('Error processing PDF:', error);
       toast({
         title: 'PDF Processing Error',
-        description: error.message || 'Failed to process PDF.',
+        description: error.message || 'Failed to process PDF. Please try entering your prompt manually.',
         variant: 'destructive',
       });
     } finally {
-      setIsPdfUploading(false);
+      // Reset the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }

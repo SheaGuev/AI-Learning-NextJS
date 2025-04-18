@@ -6,9 +6,10 @@ import { useGemini } from '@/lib/hooks/useGemini';
 import { useAppState } from '@/lib/providers/state-provider';
 import { createFile, getFolders, createFolder } from '@/supabase/queries';
 import { v4 } from 'uuid';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { extractContentFromFileData, parseUploadedPlan } from './learning-path-helpers';
 import { getDocument, GlobalWorkerOptions, PDFDocumentProxy, version } from 'pdfjs-dist';
+import { usePDFExtractor } from '@/lib/hooks/use-pdf-extractor';
 
 // Configure PDF.js worker - use a relative path for reliability
 // This loads the worker from the public directory
@@ -41,7 +42,7 @@ interface LearningPlan {
   schedule?: StudySession[];
 }
 
-const LearningPathPlanner: React.FC = () => {
+export const LearningPathPlanner: React.FC = () => {
   const { state, workspaceId, dispatch } = useAppState();
   const { toast } = useToast();
   const [goal, setGoal] = useState('');
@@ -63,6 +64,7 @@ const LearningPathPlanner: React.FC = () => {
   const [pdfProcessingState, setPdfProcessingState] = useState<'idle' | 'extracting' | 'generating'>('idle');
   const [showTextPasteModal, setShowTextPasteModal] = useState(false);
   const [pastedText, setPastedText] = useState('');
+  const { extractFullText } = usePDFExtractor();
 
   // Define preset timeframes for the slider with their positions and labels
   const sliderPresets = [
@@ -638,56 +640,53 @@ Return ONLY valid JSON with no explanations.`;
 
     // --- Handle Text/Markdown Files ---
     if (fileType === 'text/plain' || fileType === 'text/markdown' || fileName.endsWith('.md') || fileName.endsWith('.txt')) {
-       setPdfProcessingState('idle');
-       const reader = new FileReader();
-       reader.onload = async (e) => {
-         const content = e.target?.result as string;
-         if (!content) {
-           toast({
-             title: 'Error Reading File',
-             description: 'Could not read the file content.',
-             variant: 'destructive',
-           });
-           setIsFileUploading(false);
-           return;
-         }
-         try {
-           // Send content directly to AI instead of parsing it
-           await generatePlanFromText(content);
-         } catch (error: any) {
-           console.error('Error processing uploaded file:', error);
-           toast({
-             title: 'Processing Error',
-             description: `An error occurred: ${error.message || 'Unknown error'}`,
-             variant: 'destructive',
-           });
-         } finally {
-           setIsFileUploading(false);
-           event.target.value = '';
-         }
-       };
-       reader.onerror = (e) => {
-         console.error('File reading error:', e);
-         toast({
-           title: 'Error Reading File',
-           description: 'Could not read the selected file.',
-           variant: 'destructive',
-         });
-         setIsFileUploading(false);
-         event.target.value = '';
-       };
-       reader.readAsText(file);
+      setPdfProcessingState('idle');
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const content = e.target?.result as string;
+        if (!content) {
+          toast({
+            title: 'Error Reading File',
+            description: 'Could not read the file content.',
+            variant: 'destructive',
+          });
+          setIsFileUploading(false);
+          return;
+        }
+        try {
+          // Send content directly to AI instead of parsing it
+          await generatePlanFromText(content);
+        } catch (error: any) {
+          console.error('Error processing uploaded file:', error);
+          toast({
+            title: 'Processing Error',
+            description: `An error occurred: ${error.message || 'Unknown error'}`,
+            variant: 'destructive',
+          });
+        } finally {
+          setIsFileUploading(false);
+          event.target.value = '';
+        }
+      };
+      reader.onerror = (e) => {
+        console.error('File reading error:', e);
+        toast({
+          title: 'Error Reading File',
+          description: 'Could not read the selected file.',
+          variant: 'destructive',
+        });
+        setIsFileUploading(false);
+        event.target.value = '';
+      };
+      reader.readAsText(file);
     }
     // --- Handle PDF Files ---
     else if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
       setPdfProcessingState('extracting');
       
       try {
-        // Read PDF file as ArrayBuffer
-        const arrayBuffer = await file.arrayBuffer();
-        
-        // Extract text from PDF
-        const text = await extractTextFromPdf(arrayBuffer);
+        // Extract text from PDF using the new hook
+        const text = await extractFullText(file);
         
         if (text.trim().length === 0) {
           toast({
@@ -734,74 +733,14 @@ Return ONLY valid JSON with no explanations.`;
     }
     // --- Handle Unsupported Files ---
     else {
-       toast({
-         title: 'Unsupported File Type',
-         description: 'Please upload a .txt, .md, or .pdf file.',
-         variant: 'default',
-       });
-       setIsFileUploading(false);
-       setPdfProcessingState('idle');
-       event.target.value = '';
-    }
-  };
-
-  // Function to extract text from PDF
-  const extractTextFromPdf = async (arrayBuffer: ArrayBuffer): Promise<string> => {
-    try {
-      // Load PDF document
-      const loadingTask = getDocument(arrayBuffer);
-      const pdf = await loadingTask.promise;
-      
-      let extractedText = '';
-      
-      // Process each page
-      for (let i = 1; i <= pdf.numPages; i++) {
-        // Update extraction progress message for longer PDFs
-        if (pdf.numPages > 5 && i % 5 === 0) {
-          toast({
-            title: 'PDF Processing',
-            description: `Extracting page ${i} of ${pdf.numPages}...`,
-            variant: 'default',
-          });
-        }
-        
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        
-        // Concatenate text items with proper spacing
-        const pageText = textContent.items
-          .map((item: any) => {
-            if ('str' in item) {
-              return item.str;
-            }
-            return '';
-          })
-          .join(' ');
-        
-        extractedText += pageText + '\n\n';
-      }
-      
-      // Add page count message for better understanding
       toast({
-        title: 'PDF Processed',
-        description: `Successfully extracted text from ${pdf.numPages} page${pdf.numPages !== 1 ? 's' : ''}.`,
+        title: 'Unsupported File Type',
+        description: 'Please upload a .txt, .md, or .pdf file.',
         variant: 'default',
       });
-      
-      return extractedText;
-    } catch (error: any) {
-      console.error('Error extracting text from PDF:', error);
-      
-      // Provide more specific error messages based on common failures
-      if (error.message && error.message.includes('worker')) {
-        throw new Error('PDF worker failed to load. Please try refreshing the page or use the text paste option instead.');
-      } else if (error.message && error.message.includes('password')) {
-        throw new Error('The PDF is password protected. Please remove the password and try again, or use the text paste option.');
-      } else if (error.name === 'InvalidPDFException') {
-        throw new Error('The PDF file is invalid or corrupted. Please try another file or use the text paste option.');
-      } else {
-        throw new Error('Failed to extract text from PDF. Please try using the text paste option.');
-      }
+      setIsFileUploading(false);
+      setPdfProcessingState('idle');
+      event.target.value = '';
     }
   };
 
@@ -1220,8 +1159,8 @@ Return ONLY valid JSON with no explanations.`;
     <div className="bg-[#1e1e2e] border border-[#6d28d9] rounded-lg p-5 shadow-lg">
       <div className="flex flex-col space-y-4">
         {/* Content Uploader Section */}
-        {/* <div className="flex flex-wrap gap-4 pb-4 border-b border-[#44475a]"> */}
-          {/* <button 
+        <div className="flex flex-wrap gap-4 pb-4 border-b border-[#44475a]">
+          <button 
             onClick={() => setShowTextPasteModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-[#282a36] text-white rounded-lg hover:bg-[#2d2d3a]"
           >
@@ -1236,7 +1175,7 @@ Return ONLY valid JSON with no explanations.`;
               onChange={handleFileUpload}
               className="hidden"
             />
-          </label> */}
+          </label>
           
           {pdfProcessingState === 'extracting' && (
             <div className="flex items-center gap-2 text-yellow-400">
@@ -1501,8 +1440,6 @@ Return ONLY valid JSON with no explanations.`;
           </div>
         )}
       </div>
-    // </div>
+    </div>
   );
-};
-
-export default LearningPathPlanner; 
+}; 

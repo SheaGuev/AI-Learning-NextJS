@@ -14,7 +14,7 @@ import {
   deleteKnowledgeItem
 } from '@/supabase/queries';
 import { FiPlus, FiCheck, FiClock, FiFileText, FiTag, FiTrash2, FiX } from 'react-icons/fi';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { 
   calculateNextReview, 
   calculatePerformance, 
@@ -25,7 +25,7 @@ import {
   FlashcardContent,
   QuizContent
 } from './knowledge-base-utils';
-import { useLocalStorage } from '@/hooks/use-local-storage';
+import { useLocalStorage } from '@/lib/hooks/use-local-storage';
 import { Settings } from 'lucide-react';
 
 // Main component

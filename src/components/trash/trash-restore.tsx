@@ -5,7 +5,7 @@ import { File } from '@/supabase/supabase';
 import { FileIcon, FolderIcon, Trash2, UndoIcon } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { Button } from '../ui/button';
 
 const TrashRestore = () => {

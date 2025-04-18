@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import AiTutor from '@/components/dashboard-tools/ai-tutor/ai-tutor';
-import FlashcardQuizGenerator from '@/components/dashboard-tools/flashcard-quiz/flashcard-quiz-generator';
-import LearningPathPlanner from '@/components/dashboard-tools/learning-path/learning-path-planner';
+import { LearningPathPlanner } from '@/components/dashboard-tools/learning-path/learning-path-planner';
 import ResearchTool from '@/components/dashboard-tools/research/research-tool';
 import KnowledgeBaseDashboard from '@/components/dashboard-tools/knowledge-base/knowledge-base-dashboard';
 import { RiRobot2Line, RiCodeLine, RiRoadMapLine, RiSearchLine, RiBrainLine } from 'react-icons/ri';
@@ -75,8 +74,6 @@ const DashboardTools: React.FC = () => {
     switch(activeTool) {
       case 'ai-tutor':
         return <AiTutor />;
-      case 'flashcard-quiz':
-        return <FlashcardQuizGenerator />;
       case 'learning-path':
         return <LearningPathPlanner />;
       case 'research':

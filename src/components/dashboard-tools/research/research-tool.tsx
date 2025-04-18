@@ -5,7 +5,7 @@ import { FiSearch, FiExternalLink, FiFolder, FiFile, FiChevronRight, FiChevronDo
 import { useAppState } from '@/lib/providers/state-provider';
 import { getFiles, getFolders, getFileDetails, updateFile } from '@/supabase/queries';
 import { File, Folder } from '@/supabase/supabase';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 
 interface SearchResult {
   title: string;

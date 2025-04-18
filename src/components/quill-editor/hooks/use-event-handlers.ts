@@ -1,6 +1,24 @@
 import { useCallback, useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { usePDFProcessor } from './use-pdf-processor';
+
+// Centralized Markdown Formatting Instructions
+export const MARKDOWN_FORMATTING_INSTRUCTIONS = `
+Format your response using proper Markdown syntax following these guidelines:
+1. Use proper paragraph breaks with a blank line between paragraphs
+2. For bullet lists, use * with a space after it, and place each item on a new line
+3. For numbered lists, use 1. 2. 3. with a space after the period
+4. For nested lists, indent with 1 space (not tabs) before the * or number
+5. For code blocks, use triple backticks (\`\`\`) on separate lines before and after the code
+6. For inline code, surround with single backticks (\`)
+7. For headings, use # with a space after it (## for heading 2, ### for heading 3)
+8. For emphasis, use *italic* or **bold** without spaces between the asterisks and text
+9. For blockquotes, use > with a space after it at the start of each line
+10. For tables, follow this format:
+| Column 1 | Column 2 |
+| -------- | -------- |
+| cell 1   | cell 2   |
+`;
 
 export const useEventHandlers = (
   quill: any,
@@ -13,7 +31,7 @@ export const useEventHandlers = (
   quillHandler: (delta: any, oldContents: any, source: string) => void
 ) => {
   const { toast } = useToast();
-  const { extractTextFromPDF, handlePdfSectionSummary, formatPdfContent } = usePDFProcessor(quill, generateText);
+  const { extractFullText, handlePdfSectionSummary, formatPdfContent } = usePDFProcessor(quill, generateText);
 
   // Handle AI generation for text
   const handleAIGenerate = useCallback(async (prompt: string, length: string, pdfText?: string) => {
@@ -77,25 +95,10 @@ export const useEventHandlers = (
       }
       
       // Add markdown formatting instructions
-      const markdownInstructions = `
-Format your response using proper Markdown syntax following these guidelines:
-1. Use proper paragraph breaks with a blank line between paragraphs
-2. For bullet lists, use * with a space after it, and place each item on a new line
-3. For numbered lists, use 1. 2. 3. with a space after the period
-4. For nested lists, indent with 2 spaces (not tabs) before the * or number
-5. For code blocks, use triple backticks (\`\`\`) on separate lines before and after the code
-6. For inline code, surround with single backticks (\`)
-7. For headings, use # with a space after it (## for heading 2, ### for heading 3)
-8. For emphasis, use *italic* or **bold** without spaces between the asterisks and text
-9. For blockquotes, use > with a space after it at the start of each line
-10. For tables, follow this format:
-| Column 1 | Column 2 |
-| -------- | -------- |
-| cell 1   | cell 2   |
-`;
+      // const markdownInstructions = `...`; // Original definition removed
       
       // Combine prompt with instructions
-      const fullPrompt = `${prompt}\n\n${markdownInstructions}\n\n${lengthInstruction || ''}`;
+      const fullPrompt = `${prompt}\n\n${MARKDOWN_FORMATTING_INSTRUCTIONS}\n\n${lengthInstruction || ''}`;
       console.log('Calling generateText with prompt length:', fullPrompt.length);
       
       // Generate text with AI
@@ -255,7 +258,7 @@ Format your response using proper Markdown syntax following these guidelines:
   const handlePDFToFlashcard = useCallback(async (file: File, flashcardNode: any, cardCount: number = 10) => {
     try {
       // Extract text from PDF
-      const extractedText = await extractTextFromPDF(file);
+      const extractedText = await extractFullText(file);
       
       // Update toast
       toast({
@@ -296,7 +299,7 @@ Format your response using proper Markdown syntax following these guidelines:
         variant: 'destructive',
       });
     }
-  }, [extractTextFromPDF, handleFlashcardAIGenerate, quill, toast]);
+  }, [extractFullText, handleFlashcardAIGenerate, quill, toast]);
 
   // Handle quiz generation from content
   const handleQuizAIGenerate = useCallback(async (content: string, questionCount: number, quizNode: any) => {
@@ -395,7 +398,7 @@ Format your response using proper Markdown syntax following these guidelines:
   const handlePDFToQuiz = useCallback(async (file: File, quizNode: any, questionCount: number = 5) => {
     try {
       // Extract text from PDF
-      const extractedText = await extractTextFromPDF(file);
+      const extractedText = await extractFullText(file);
       
       // Update toast
       toast({
@@ -436,7 +439,7 @@ Format your response using proper Markdown syntax following these guidelines:
         variant: 'destructive',
       });
     }
-  }, [extractTextFromPDF, handleQuizAIGenerate, quill, toast]);
+  }, [extractFullText, handleQuizAIGenerate, quill, toast]);
 
   // Helper function to process quiz data
   const processQuizData = (questionData: any[]) => {
@@ -524,6 +527,70 @@ Format your response using proper Markdown syntax following these guidelines:
         console.error('Error updating quiz:', error);
         throw error;
       }
+    }
+  };
+
+  // Handle SINGLE PDF section insertion with formatting
+  const handlePdfSingleInsertWithSummary = async (e: any) => {
+    const { heading, summary, content, range, quill: eventQuill } = e.detail;
+
+    if (eventQuill !== quill) return;
+    if (!apiKeyExists) {
+      setShowAPIKeyDialog(true);
+      return;
+    }
+
+    toast({
+      title: 'Formatting Section',
+      description: 'Formatting section content with AI...',
+    });
+
+    try {
+      // Define formatting instructions (similar to PdfProcessor)
+      // const formattingInstructions = `...`; // Original definition removed
+
+      // Call the AI to format the content (using formatPdfContent which calls generateText)
+      // Use the centralized instructions here
+      const formattedContent = await formatPdfContent(content, heading, MARKDOWN_FORMATTING_INSTRUCTIONS);
+
+      if (formattedContent) {
+        // Dispatch event for PdfProcessor to handle the actual insertion
+        const insertEvent = new CustomEvent('pdf-insert-final-content', {
+          detail: {
+            content: formattedContent,
+            range,
+            quill
+          },
+          bubbles: true
+        });
+        document.dispatchEvent(insertEvent);
+
+        toast({
+          title: 'Section Formatted',
+          description: 'Formatted section content is ready for insertion.',
+        });
+      } else {
+        throw new Error('AI failed to format section content.');
+      }
+
+    } catch (error: any) {
+      console.error('Error formatting/inserting single PDF section:', error);
+      toast({
+        title: 'Error Formatting Section',
+        description: error.message || 'Failed to format content. Inserting raw content as fallback.',
+        variant: 'destructive',
+      });
+
+      // Fallback: Dispatch event to insert raw content
+      const fallbackInsertEvent = new CustomEvent('pdf-insert-final-content', {
+        detail: {
+          content: `## ${heading}\n\n*${summary}*\n\n${content}\n\n`, // Basic markdown fallback
+          range,
+          quill
+        },
+        bubbles: true
+      });
+      document.dispatchEvent(fallbackInsertEvent);
     }
   };
 
@@ -676,6 +743,107 @@ Format your response using proper Markdown syntax following these guidelines:
         console.error('Error handling PDF content formatting:', error);
       }
     };
+
+    // Handle combined PDF section insertion and formatting
+    const handlePdfCombinedInsertEvent = async (e: any) => {
+      const { sections, range, quill: eventQuill } = e.detail;
+
+      if (eventQuill !== quill) return;
+      if (!apiKeyExists) {
+        setShowAPIKeyDialog(true);
+        return;
+      }
+
+      toast({
+        title: 'Processing Selected Sections',
+        description: `Formatting ${sections.length} sections with AI...`,
+      });
+
+      try {
+        // Format each section individually using Promise.allSettled
+        const formatPromises = sections.map((section: any) => {
+          // Use the centralized instructions here
+          const formattingPrompt = `Please format the following text content using Markdown.
+${MARKDOWN_FORMATTING_INSTRUCTIONS}
+
+Original Heading: ${section.heading}
+Original Summary: ${section.summary}
+
+Content to format:
+${section.content}`;
+          
+          // Return the promise from generateText
+          return generateText(formattingPrompt, '')
+            .then(formatted => ({ status: 'fulfilled', value: formatted, original: section }))
+            .catch(error => ({ status: 'rejected', reason: error, original: section }));
+        });
+
+        const results = await Promise.allSettled(formatPromises);
+
+        let finalCombinedContent = '';
+        let rawFallbackContent = ''; // For fallback if all formatting fails
+        let successfulFormats = 0;
+
+        results.forEach((result, index) => {
+          // Build raw fallback content regardless of success
+          rawFallbackContent += `## ${sections[index].heading}\n\n*${sections[index].summary}*\n\n${sections[index].content}\n\n`;
+          if (index < sections.length - 1) {
+            rawFallbackContent += '\n\n---\n\n';
+          }
+
+          // Process formatted content
+          if (result.status === 'fulfilled' && result.value.status === 'fulfilled' && result.value.value) {
+            finalCombinedContent += result.value.value + '\n\n';
+            successfulFormats++;
+          } else {
+            // If formatting failed for a section, append its raw content to the final output
+            console.warn(`Formatting failed for section ${index + 1}. Appending raw content.`, result.status === 'fulfilled' ? result.value.reason : result.reason);
+            finalCombinedContent += `## ${sections[index].heading}\n\n*${sections[index].summary}*\n\n${sections[index].content}\n\n`;
+          }
+          
+          // Add separator
+          if (index < results.length - 1) {
+            finalCombinedContent += '---\n\n';
+          }
+        });
+
+        if (successfulFormats === 0) {
+           // If ALL formatting failed, insert the completely raw combined content
+           console.error('All section formatting failed. Inserting raw combined content.');
+           quill.insertText(range.index, rawFallbackContent, 'user');
+           quill.setSelection(range.index + rawFallbackContent.length, 0);
+           toast({
+             title: 'Formatting Failed',
+             description: 'Could not format sections with AI. Raw content inserted.',
+             variant: 'destructive',
+           });
+        } else {
+            // Insert the combined content (mix of formatted and raw)
+            quill.insertText(range.index, finalCombinedContent.trim(), 'user');
+            quill.setSelection(range.index + finalCombinedContent.trim().length, 0);
+
+            toast({
+                title: 'Sections Inserted',
+                description: successfulFormats === sections.length
+                ? 'Formatted content from selected sections added.'
+                : `Formatted ${successfulFormats}/${sections.length} sections. Raw content used for others.`,
+                variant: 'default',
+            });
+        }
+
+      } catch (error: any) { // Catch errors from Promise.allSettled itself (unlikely)
+        console.error('Unexpected error during combined section processing:', error);
+        toast({
+          title: 'Error Inserting Sections',
+          description: 'An unexpected error occurred. Please try again.',
+          variant: 'destructive',
+        });
+        // Attempt to insert raw content as a last resort
+        let rawContent = sections.map((s:any) => `## ${s.heading}\n\n*${s.summary}*\n\n${s.content}`).join('\n\n---\n\n');
+        quill.insertText(range.index, rawContent, 'user');
+        quill.setSelection(range.index + rawContent.length, 0);
+      }
+    };
     
     // Register all event listeners
     document.addEventListener('flashcard-save-needed', handleDirectSaveRequest);
@@ -686,6 +854,8 @@ Format your response using proper Markdown syntax following these guidelines:
     document.addEventListener('quiz-pdf-upload', handleQuizPDFUploadEvent);
     document.addEventListener('ai-generate-section-summary', handlePdfSectionSummaryEvent);
     document.addEventListener('ai-format-pdf-content', handlePdfContentFormattingEvent);
+    document.addEventListener('pdf-insert-formatted-combined', handlePdfCombinedInsertEvent);
+    document.addEventListener('pdf-insert-with-summary', handlePdfSingleInsertWithSummary);
     
     // Cleanup function
     return () => {
@@ -698,10 +868,14 @@ Format your response using proper Markdown syntax following these guidelines:
       document.removeEventListener('quiz-pdf-upload', handleQuizPDFUploadEvent);
       document.removeEventListener('ai-generate-section-summary', handlePdfSectionSummaryEvent);
       document.removeEventListener('ai-format-pdf-content', handlePdfContentFormattingEvent);
+      document.removeEventListener('pdf-insert-formatted-combined', handlePdfCombinedInsertEvent);
+      document.removeEventListener('pdf-insert-with-summary', handlePdfSingleInsertWithSummary);
     };
   }, [
     quill, 
     apiKeyExists, 
+    generateText,
+    toast,
     fileId,
     quillHandler,
     handleFlashcardAIGenerate,

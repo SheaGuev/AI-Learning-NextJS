@@ -1,11 +1,17 @@
 // Sections dialog for PDF processing
 import { Dialog, ProcessedSection } from '../interfaces';
 
+declare global {
+  interface Window {
+    geminiModel: any; // Declare geminiModel globally for this file
+  }
+}
+
 export default class SectionsDialog {
   private static dialog: Dialog | null = null;
   private static processingQueue: ProcessedSection[] = [];
   private static isProcessing: boolean = false;
-  private static processingDelay: number = 2000; // 2 second delay between processing sections
+  private static processingDelay: number = 1000; // Reduced delay to 1 second
   private static maxConcurrentProcessing: number = 1; // Process one section at a time
   
   // Static initializer to set up event listeners
@@ -344,32 +350,24 @@ export default class SectionsDialog {
     insertAllBtn.addEventListener('click', () => {
       const selectedSections = processedSections.filter(s => s.selected && s.heading);
       if (selectedSections.length === 0) return;
-      
-      // Build combined content
-      let combinedContent = '';
-      
-      // Insert each section with heading and summary
-      selectedSections.forEach((section, index) => {
-        const formattedContent = `## ${section.heading}\n\n*${section.summary}*\n\n${section.content}\n\n`;
-        combinedContent += formattedContent;
-        
-        // Add a separator between sections (except for the last one)
-        if (index < selectedSections.length - 1) {
-          combinedContent += '\n\n---\n\n';
-        }
-      });
-      
-      // Dispatch event to insert content
-      const event = new CustomEvent('pdf-insert-content', {
+
+      // Dispatch an event requesting the combined formatted insertion
+      // The actual AI call and insertion will be handled by use-event-handlers.ts
+      const event = new CustomEvent('pdf-insert-formatted-combined', {
         detail: {
-          content: combinedContent,
+          sections: selectedSections.map(s => ({ // Pass necessary section data
+            heading: s.heading,
+            summary: s.summary,
+            content: s.content
+          })),
           range,
           quill
-        }
+        },
+        bubbles: true // Allow event to bubble up if needed
       });
       document.dispatchEvent(event);
-      
-      // Close dialog
+
+      // Close the dialog immediately after requesting the action
       SectionsDialog.closeSectionsDialog();
     });
     

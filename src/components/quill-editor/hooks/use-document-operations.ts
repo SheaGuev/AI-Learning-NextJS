@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { useAppState } from '@/lib/providers/state-provider';
 import { useRouter } from 'next/navigation';
 import { deleteFile, deleteFolder, updateFile, updateFolder, updateWorkspace } from '@/supabase/queries';

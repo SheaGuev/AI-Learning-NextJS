@@ -7,7 +7,7 @@ import { PlusIcon } from 'lucide-react';
 import { useSupabaseUser } from '@/lib/providers/supabase-user-provider';
 import { v4 } from 'uuid';
 import { createFolder } from '@/supabase/queries';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { Accordion } from '../ui/accordion';
 import TooltipWrapper from '../global/tooltip-wrapper';
 import Dropdown from './Dropdown';

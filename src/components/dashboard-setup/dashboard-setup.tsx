@@ -18,7 +18,7 @@ import { Subscription, workspace } from '../../supabase/supabase';
 import { Button } from '../ui/button';
 import Loader from '../global/loader';
 import { createWorkspace } from '../../supabase/queries';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAppState } from '../../lib/providers/state-provider';
 import { createBClient } from '@/lib/server-actions/createClient';

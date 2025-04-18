@@ -3,83 +3,9 @@ import { ContentFormatter } from '../ai-helpers/ContentFormatter';
 import { ProcessedSection, OverlayControls } from '../interfaces';
 import { OverlayManager } from '../ui/OverlayManager';
 import SectionsDialog from './SectionsDialog';
+import { extractFullTextFromFile } from '@/lib/hooks/use-pdf-extractor';
 
-const API_CALL_DELAY = 2000; // 2 second delay between API calls
-const MAX_RETRIES = 3; // Maximum number of retries for API calls
-const RETRY_DELAY = 5000; // 5 second delay between retries
-
-// Create a simple Gemini model interface for direct API calls
-const geminiModel = {
-  generateContent: async (prompt: string): Promise<{ text: string }> => {
-    let retries = 0;
-    
-    while (retries < MAX_RETRIES) {
-      try {
-        const apiKey = localStorage.getItem('gemini_api_key');
-        
-        if (!apiKey) {
-          throw new Error('Gemini API key not found. Please set your API key in the settings.');
-        }
-        
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 2048,
-              topP: 0.95,
-              topK: 40,
-            },
-          }),
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
-          
-          // Check for rate limit errors
-          if (response.status === 429 || (errorData.error?.message && errorData.error.message.includes('rate'))) {
-            console.warn(`Rate limit hit, retrying (${retries + 1}/${MAX_RETRIES})...`);
-            retries++;
-            
-            // Wait before retrying
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-            continue;
-          }
-          
-          throw new Error(`Gemini API error: ${errorData.error?.message || 'Unknown error'}`);
-        }
-        
-        const data = await response.json();
-        const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        
-        return { text: generatedText };
-      } catch (error) {
-        console.error(`Error calling Gemini API (attempt ${retries + 1}/${MAX_RETRIES}):`, error);
-        
-        // If it's a JSON parsing error, try to extract useful information
-        if (error instanceof SyntaxError) {
-          console.error('JSON parsing error, retrying...');
-          retries++;
-          
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-          continue;
-        }
-        
-        // For other errors, throw immediately
-        throw error;
-      }
-    }
-    
-    // If we've exhausted retries, throw a specific error
-    throw new Error(`Failed to call Gemini API after ${MAX_RETRIES} attempts`);
-  }
-};
+const API_CALL_DELAY = 1000; // 1 second delay between processing sections
 
 export class PdfProcessor {
   // Initialize event listeners for the PDF processing events
@@ -104,15 +30,16 @@ export class PdfProcessor {
         // Limit content size more aggressively
         const contentToProcess = section.content.substring(0, 2000); // Reduced from 3000
         
+        // Dispatch the event to be handled by use-event-handlers
         const aiGenerateEvent = new CustomEvent('ai-generate-section-summary', {
           detail: { content: contentToProcess },
           bubbles: true
         });
         
-        // Register one-time response handler for the AI event
+        // Register one-time response handler for the AI event dispatched from use-event-handlers
         const responseHandler = (responseEvent: any) => {
           try {
-            // Process the response
+            // Process the response received from use-event-handlers
             const { heading, summary } = responseEvent.detail;
             section.heading = heading || 'Untitled Section';
             section.summary = summary || 'No summary available';
@@ -244,14 +171,13 @@ export class PdfProcessor {
           handleProcessingError();
         }, 15000);
         
-        // Listen once for response
+        // Listen once for the response event dispatched by use-event-handlers
         document.addEventListener('ai-section-summary-response', (event) => {
           clearTimeout(responseTimeout);
-          document.removeEventListener('ai-section-summary-response', responseHandler);
           responseHandler(event);
         }, { once: true });
         
-        // Dispatch the event
+        // Dispatch the event to trigger the handler in use-event-handlers
         document.dispatchEvent(aiGenerateEvent);
         
       } catch (error) {
@@ -267,197 +193,44 @@ export class PdfProcessor {
       }
     });
     
-    // Listen for content insertion request
+    // Listen for the final insertion request from use-event-handlers
+    document.addEventListener('pdf-insert-final-content', (event: any) => {
+      const { content, range, quill } = event.detail;
+      this.insertSectionContent(quill, content, range); // Use the existing method for actual insertion
+    });
+
+    // Listen for content insertion request (handled by insertSectionContent)
     document.addEventListener('pdf-insert-content', (event: any) => {
       const { content, range, quill } = event.detail;
       this.insertSectionContent(quill, content, range);
     });
     
-    // Listen for content with summary insertion request
-    document.addEventListener('pdf-insert-with-summary', (event: any) => {
-      const { heading, summary, content, range, quill } = event.detail;
-      
-      // Create unique key for this insertion
-      const insertionKey = `${heading}-${Date.now()}`;
-      
-      // Check if already processing
-      if (activeInsertions.has(insertionKey)) {
-        console.log('Duplicate insertion request ignored');
-        return;
-      }
-      
-      // Mark as active
-      activeInsertions.add(insertionKey);
-      
-      // Process the insertion
-      this.insertSectionWithSummary(quill, heading, summary, content, range)
-        .finally(() => {
-          // Clean up after processing
-          activeInsertions.delete(insertionKey);
-        });
-    });
-    
-    // For compatibility with old code:
-    
-    // Listen for section processing request (old style batch processing - no longer used)
+    // REMOVE Deprecated Listeners
+    /*
     document.addEventListener('pdf-process-sections', (event: any) => {
       console.warn('pdf-process-sections event is deprecated, use pdf-process-section instead');
     });
-    
-    // Listen for enhanced content insertion request (no longer used)
     document.addEventListener('pdf-insert-enhanced', (event: any) => {
       const { heading, summary, content, range, quill } = event.detail;
-      // Just use regular insertion instead of enhanced
-      this.insertSectionWithSummary(quill, heading, summary, content, range);
+       // We now trigger the new flow via the button's 'pdf-insert-with-summary' dispatch
+       // This listener is essentially redundant for new clicks, but kept for potential legacy calls.
+       // Ideally, we'd refactor to remove this if no longer needed.
+      console.warn('pdf-insert-enhanced is deprecated. Use the section dialog insert button.');
+       // Trigger the new handler indirectly if possible (though direct call might be needed if context is lost)
+       const insertEvent = new CustomEvent('pdf-insert-with-summary', { detail: event.detail, bubbles: true });
+       document.dispatchEvent(insertEvent);
     });
-    
-    // Listen for multiple sections insertion request (no longer used)
     document.addEventListener('pdf-insert-sections', (event: any) => {
       const { sections, range, quill } = event.detail;
-      
-      // Build combined content
-      let combinedContent = '';
-      
-      // Insert each section with heading and summary
-      sections.forEach((section: any, index: number) => {
-        const formattedContent = `## ${section.heading}\n\n*${section.summary}*\n\n${section.content}\n\n`;
-        combinedContent += formattedContent;
-        
-        // Add a separator between sections (except for the last one)
-        if (index < sections.length - 1) {
-          combinedContent += '\n\n---\n\n';
-        }
-      });
-      
-      // Insert the combined content
-      this.insertSectionContent(quill, combinedContent, range);
+       // This now uses the 'pdf-insert-formatted-combined' flow triggered by the button
+       // Kept for legacy, but should ideally be removed.
+       console.warn('pdf-insert-sections is deprecated. Use the section dialog insert button.');
+       const insertEvent = new CustomEvent('pdf-insert-formatted-combined', { detail: event.detail, bubbles: true });
+       document.dispatchEvent(insertEvent);
     });
-    
-    // Force loading SectionsDialog to ensure its event listeners are initialized
+    */
+
     console.log('SectionsDialog initialized:', SectionsDialog ? 'Yes' : 'No');
-
-    // Modify the section summary handler to be more efficient
-    document.addEventListener('ai-generate-section-summary', async (event: any) => {
-      const { content } = event.detail;
-      
-      try {
-        const response = await geminiModel.generateContent(`
-          Analyze this text concisely:
-          ${content}
-          
-          Provide only:
-          1. A short heading (max 6 words)
-          2. A one-sentence summary
-          
-          Format: {"heading": "heading", "summary": "summary"}
-        `);
-        
-        try {
-          // Safely parse the JSON response
-          const parsedResponse = JSON.parse(response.text);
-          
-          // Validate the response structure
-          if (!parsedResponse.heading || !parsedResponse.summary) {
-            throw new Error('Invalid response format');
-          }
-          
-          document.dispatchEvent(new CustomEvent('ai-section-summary-response', {
-            detail: parsedResponse,
-            bubbles: true
-          }));
-        } catch (parseError) {
-          console.error('Error parsing Gemini response:', parseError);
-          
-          // Create a fallback response
-          const words = content.split(/\s+/);
-          const headingWords = words.slice(0, Math.min(6, words.length));
-          let heading = headingWords.join(' ');
-          
-          // Capitalize first letter and add ellipsis if truncated
-          heading = heading.charAt(0).toUpperCase() + heading.slice(1);
-          if (words.length > 6) heading += '...';
-          
-          // First sentence for summary
-          const sentences = content.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
-          const summary = sentences.length > 0 ? sentences[0].trim() + '.' : 'No summary available.';
-          
-          document.dispatchEvent(new CustomEvent('ai-section-summary-response', {
-            detail: { heading, summary },
-            bubbles: true
-          }));
-        }
-      } catch (error) {
-        console.error('Gemini API error:', error);
-        
-        // Create a fallback response
-        const words = content.split(/\s+/);
-        const headingWords = words.slice(0, Math.min(6, words.length));
-        let heading = headingWords.join(' ');
-        
-        // Capitalize first letter and add ellipsis if truncated
-        heading = heading.charAt(0).toUpperCase() + heading.slice(1);
-        if (words.length > 6) heading += '...';
-        
-        // First sentence for summary
-        const sentences = content.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
-        const summary = sentences.length > 0 ? sentences[0].trim() + '.' : 'No summary available.';
-        
-        document.dispatchEvent(new CustomEvent('ai-section-summary-response', {
-          detail: { heading, summary },
-          bubbles: true
-        }));
-      }
-    });
-
-    // In your Gemini event handlers setup
-    document.addEventListener('ai-format-content', async (event: any) => {
-      const { heading, summary, content, formatKey } = event.detail;
-      
-      try {
-        const response = await geminiModel.generateContent(`
-          Format the following content with proper structure and formatting.
-          Add appropriate headers, bullet points, and formatting where relevant.
-          Preserve the main heading and summary, but enhance the content structure.
-          
-          Original Heading: ${heading}
-          Original Summary: ${summary}
-          
-          Content to format:
-          ${content}
-          
-          Please format the content with:
-          1. Clear hierarchy of headers (using markdown ##, ###, etc.)
-          2. Bullet points for lists
-          3. Proper paragraph breaks
-          4. Emphasis on key points
-          5. Block quotes for important quotes if present
-          6. Code blocks if technical content is present
-          
-          Return the fully formatted content in markdown format.
-        `);
-        
-        document.dispatchEvent(new CustomEvent('ai-format-content-response', {
-          detail: {
-            formattedContent: response.text,
-            formatKey
-          },
-          bubbles: true
-        }));
-      } catch (error) {
-        console.error('Gemini formatting error:', error);
-        
-        // Create a fallback formatted content
-        const fallbackContent = `## ${heading}\n\n*${summary}*\n\n${content}\n\n`;
-        
-        document.dispatchEvent(new CustomEvent('ai-format-content-response', {
-          detail: {
-            formattedContent: fallbackContent,
-            formatKey
-          },
-          bubbles: true
-        }));
-      }
-    });
   }
   
   /**
@@ -527,55 +300,66 @@ export class PdfProcessor {
   static async processPdf(quill: any, file: File, range: any): Promise<void> {
     console.log('Processing PDF file', { fileName: file.name, fileSize: file.size });
     
-    // Initialize event listeners
-    this.initializeEventListeners();
-    
-    // Make sure PDF.js is loaded
-    if (!window.pdfjsLib) {
-      await new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
-        script.onload = () => {
-          console.log('PDF.js library loaded successfully');
-          
-          // Set the worker URL using a CDN worker file instead of local
-          try {
-            if (window.pdfjsLib && 'GlobalWorkerOptions' in (window.pdfjsLib as any)) {
-              // Use the CDN version which is properly compiled
-              (window.pdfjsLib as any).GlobalWorkerOptions.workerSrc = 
-                'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-              console.log('PDF.js worker URL set to CDN version');
-            }
-          } catch (e) {
-            console.error('Error setting PDF.js worker URL:', e);
-          }
-          
-          resolve();
-        };
-        script.onerror = () => reject(new Error('Failed to load PDF.js'));
-        document.head.appendChild(script);
-      });
-    }
-    
-    // Check again if PDF.js loaded properly
-    if (!window.pdfjsLib) {
-      throw new Error('Failed to load PDF.js library');
-    }
-    
-    // Read the PDF file
-    const arrayBuffer = await file.arrayBuffer();
-    const pdfData = new Uint8Array(arrayBuffer);
-    
-    // Load the PDF document
-    let pdf;
+    // Note: initializeEventListeners is likely already called by handlePdfUpload
+    // this.initializeEventListeners(); // Redundant call removed
+
     try {
-      const loadingTask = window.pdfjsLib.getDocument({ data: pdfData });
-      pdf = await loadingTask.promise;
-    } catch (error) {
-      console.error('Error loading PDF document:', error);
+      // Use the standalone function from the hook to extract text
+      // It handles PDF.js loading internally.
+      const extractedText = await extractFullTextFromFile(file);
       
-      // Show fallback UI to let user know processing failed
-      const errorDialog = document.createElement('div');
+      console.log('Extracted text length:', extractedText.length);
+      
+      // Increase words per section to reduce total sections
+      const wordsPerSection = 2000; // Increased from 1000
+      const sections: string[] = [];
+      
+      // More aggressive section splitting to reduce total sections
+      const paragraphs = extractedText.split(/\n\s*\n/); // Split by double newlines
+      let currentSection = '';
+      
+      for (const paragraph of paragraphs) {
+        if ((currentSection + paragraph).split(/\s+/).length > wordsPerSection) {
+          if (currentSection) {
+            sections.push(currentSection.trim());
+          }
+          currentSection = paragraph;
+        } else {
+          currentSection += '\n\n' + paragraph;
+        }
+      }
+      
+      if (currentSection) {
+        sections.push(currentSection.trim());
+      }
+  
+      console.log(`Text divided into ${sections.length} sections (optimized)`);
+      
+      // Show warning if too many sections
+      if (sections.length > 10) {
+        const warning = document.createElement('div');
+        warning.className = 'pdf-warning-toast';
+        warning.textContent = `This PDF is quite large (${sections.length} sections). Processing may take some time.`;
+        // Add styling for visibility
+        warning.style.position = 'fixed';
+        warning.style.bottom = '20px';
+        warning.style.left = '50%';
+        warning.style.transform = 'translateX(-50%)';
+        warning.style.backgroundColor = '#4b5563';
+        warning.style.color = '#fff';
+        warning.style.padding = '10px 20px';
+        warning.style.borderRadius = '5px';
+        warning.style.zIndex = '2000';
+        document.body.appendChild(warning);
+        setTimeout(() => warning.remove(), 5000);
+      }
+  
+      SectionsDialog.showSectionsDialog(quill, sections, range);
+    } catch (error: any) {
+      // Handle errors during extraction or processing
+      console.error('Error processing PDF in processPdf:', error);
+      // Show fallback UI or rethrow error
+       const errorDialog = document.createElement('div');
       errorDialog.className = 'pdf-error-dialog';
       errorDialog.style.position = 'fixed';
       errorDialog.style.top = '50%';
@@ -589,16 +373,16 @@ export class PdfProcessor {
       errorDialog.style.zIndex = '2000';
       errorDialog.style.width = '400px';
       errorDialog.style.textAlign = 'center';
-      
+
       const errorTitle = document.createElement('h3');
       errorTitle.textContent = 'PDF Processing Failed';
       errorTitle.style.margin = '0 0 10px 0';
       errorTitle.style.color = '#ef4444';
-      
+
       const errorMessage = document.createElement('p');
-      errorMessage.textContent = 'We encountered an issue processing your PDF. This may be due to the PDF format or restrictions.';
+      errorMessage.textContent = error.message || 'We encountered an issue processing your PDF. This may be due to the PDF format or restrictions.';
       errorMessage.style.margin = '0 0 20px 0';
-      
+
       const closeButton = document.createElement('button');
       closeButton.textContent = 'Close';
       closeButton.style.backgroundColor = '#4b5563';
@@ -610,69 +394,21 @@ export class PdfProcessor {
       closeButton.onclick = () => {
         document.body.removeChild(errorDialog);
       };
-      
+
       errorDialog.appendChild(errorTitle);
       errorDialog.appendChild(errorMessage);
       errorDialog.appendChild(closeButton);
       document.body.appendChild(errorDialog);
-      
-      throw new Error('PDF processing failed');
-    }
-    
-    // Extract text from all pages
-    let extractedText = '';
-    const totalPages = pdf.numPages;
-    
-    for (let i = 1; i <= totalPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const textItems = textContent.items.map((item: any) => item.str).join(' ');
-      extractedText += textItems + '\n\n';
-    }
-    
-    console.log('Extracted text length:', extractedText.length);
-    
-    // Increase words per section to reduce total sections
-    const wordsPerSection = 2000; // Increased from 1000
-    const sections = [];
-    
-    // More aggressive section splitting to reduce total sections
-    const paragraphs = extractedText.split(/\n\s*\n/); // Split by double newlines
-    let currentSection = '';
-    
-    for (const paragraph of paragraphs) {
-      if ((currentSection + paragraph).split(/\s+/).length > wordsPerSection) {
-        if (currentSection) {
-          sections.push(currentSection.trim());
-        }
-        currentSection = paragraph;
-      } else {
-        currentSection += '\n\n' + paragraph;
-      }
-    }
-    
-    if (currentSection) {
-      sections.push(currentSection.trim());
-    }
 
-    console.log(`Text divided into ${sections.length} sections (optimized)`);
-    
-    // Show warning if too many sections
-    if (sections.length > 10) {
-      const warning = document.createElement('div');
-      warning.className = 'pdf-warning-toast';
-      warning.textContent = `This PDF is quite large (${sections.length} sections). Processing may take some time.`;
-      document.body.appendChild(warning);
-      setTimeout(() => warning.remove(), 5000);
+      // Propagate the error to the caller (e.g., handlePdfUpload)
+      throw error; // Rethrow the error so handlePdfUpload can catch it
     }
-
-    SectionsDialog.showSectionsDialog(quill, sections, range);
   }
   
   /**
    * Insert plain content
    */
-  static insertSectionContent(quill: any, content: string, range: any): void {
+  static async insertSectionContent(quill: any, content: string, range: any): Promise<void> {
     if (!quill) return;
     
     // Close the dialog first
@@ -681,72 +417,44 @@ export class PdfProcessor {
     // Force cleanup of all overlays
     OverlayManager.clearAllProcessingOverlays();
     
-    // Insert content at the cursor position with safety debounce
-    ContentFormatter.safeInsertText(quill, range.index, content);
+    // Prepare content: ONLY ensure spacing after list markers
+    const preparedContent = content
+      // .replace(/^(\s*)([*\-+])(?! )/gm, '$1$2 ')
+      // .replace(/^(\s*)(\d+\.)(?! )/gm, '$1$2 ');
+    
+    try {
+      // Insert content at the cursor position with enhanced safety
+      await ContentFormatter.safeInsertText(quill, range.index, preparedContent);
+      
+      // Remove redundant explicit call to ensureMarkdownProcessed
+      /*
+      setTimeout(() => {
+        ContentFormatter.ensureMarkdownProcessed(quill);
+      }, 200);
+      */
+    } catch (error) {
+      console.error('Error inserting content:', error);
+      // Fallback to basic insertion if the enhanced method fails
+      quill.insertText(range.index, preparedContent, 'user');
+      quill.setSelection(range.index + preparedContent.length, 0);
+    }
   }
   
   /**
-   * Insert with heading and summary
+   * Insert with heading and summary (REMOVED COMPLEX LOGIC)
+   * This method is now largely unused as the formatting is handled
+   * by use-event-handlers listening for 'pdf-insert-with-summary'.
+   * Kept temporarily for potential legacy compatibility or future refactoring.
    */
   static async insertSectionWithSummary(quill: any, heading: string, summary: string, content: string, range: any): Promise<void> {
-    if (!quill) return;
-    
-    // Create unique key for this formatting request
-    const formatKey = `format-${Date.now()}`;
-    
-    try {
-      // Show formatting indicator
-      const formattingOverlay = document.createElement('div');
-      formattingOverlay.className = 'pdf-formatting-overlay';
-      formattingOverlay.textContent = 'Formatting content...';
-      document.body.appendChild(formattingOverlay);
-      
-      // Create a formatting request event with the unique key
-      const formatEvent = new CustomEvent('ai-format-content', {
-        detail: {
-          heading,
-          summary,
-          content,
-          formatKey // Include key to track this specific request
-        },
-        bubbles: true
-      });
-      
-      // Wait for formatted content with key matching
-      const formattedContent = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Formatting timeout'));
-        }, 15000);
-        
-        const handleResponse = (response: any) => {
-          if (response.detail.formatKey === formatKey) {
-            clearTimeout(timeout);
-            document.removeEventListener('ai-format-content-response', handleResponse);
-            resolve(response.detail.formattedContent);
-          }
-        };
-        
-        document.addEventListener('ai-format-content-response', handleResponse);
-        document.dispatchEvent(formatEvent);
-      });
-      
-      // Close dialog and insert formatted content
-      this.closeSectionsDialog();
-      
-      // Use a safe insert method that prevents duplicates
-      await ContentFormatter.safeInsertText(quill, range.index, formattedContent as string);
-      
-    } catch (error) {
-      console.error('Error formatting content:', error);
-      // Fallback to basic formatting
-      const basicFormattedContent = `## ${heading}\n\n*${summary}*\n\n${content}\n\n`;
-      this.closeSectionsDialog();
-      await ContentFormatter.safeInsertText(quill, range.index, basicFormattedContent);
-    } finally {
-      // Remove formatting overlay
-      const overlay = document.querySelector('.pdf-formatting-overlay');
-      if (overlay) overlay.remove();
-    }
+     console.warn('PdfProcessor.insertSectionWithSummary called directly - this flow is deprecated.');
+     // Fallback to inserting basic formatted content directly if this is somehow still called
+     const basicFormattedContent = `## ${heading}\n\n*${summary}*\n\n${content}\n\n`;
+     try {
+       await this.insertSectionContent(quill, basicFormattedContent, range);
+     } catch (error) {
+        console.error('Error in deprecated insertSectionWithSummary fallback:', error);
+     }
   }
   
   /**
@@ -763,6 +471,69 @@ export class PdfProcessor {
     const overlay = document.querySelector('div[style*="position: fixed"][style*="background-color: rgba(0, 0, 0, 0.5)"]');
     if (overlay && overlay.parentNode) {
       overlay.parentNode.removeChild(overlay);
+    }
+  }
+
+  /**
+   * Clean text that might contain markdown or code blocks to extract valid JSON
+   */
+  private static cleanJsonText(text: string): string {
+    // First, try to extract JSON from code blocks with language specifiers
+    const jsonCodeBlockRegex = /```(?:json|javascript|js)?\s*([\s\S]*?)\s*```/g;
+    const jsonMatches = [...text.matchAll(jsonCodeBlockRegex)];
+    
+    if (jsonMatches.length > 0) {
+      // Use the first match
+      const extractedJson = jsonMatches[0][1].trim();
+      if (this.isValidJson(extractedJson)) {
+        return extractedJson;
+      }
+    }
+    
+    // If no valid JSON in code blocks, try to extract JSON-like structures with regex
+    const jsonPattern = /\{[\s\S]*?\}/g;
+    const matches = text.match(jsonPattern);
+    if (matches && matches.length > 0) {
+      // Try each match until we find valid JSON
+      for (const match of matches) {
+        const cleaned = match.trim();
+        if (this.isValidJson(cleaned)) {
+          return cleaned;
+        }
+      }
+    }
+    
+    // If still no valid JSON, try to clean the entire text
+    let cleaned = text
+      // Remove markdown code blocks
+      .replace(/```[\s\S]*?```/g, '')
+      // Remove any remaining backticks
+      .replace(/`/g, '')
+      // Remove any markdown formatting
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/_/g, '')
+      // Trim whitespace
+      .trim();
+    
+    // If the cleaned text is valid JSON, return it
+    if (this.isValidJson(cleaned)) {
+      return cleaned;
+    }
+    
+    // If all else fails, return the original text
+    return text;
+  }
+  
+  /**
+   * Check if a string is valid JSON
+   */
+  private static isValidJson(text: string): boolean {
+    try {
+      JSON.parse(text);
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 } 

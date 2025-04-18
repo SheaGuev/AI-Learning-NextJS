@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { useAppState } from '@/lib/providers/state-provider';
 import { User, workspace } from '@/supabase/supabase';
 import { useSupabaseUser } from '@/lib/providers/supabase-user-provider';

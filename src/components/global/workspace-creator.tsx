@@ -21,7 +21,7 @@ import CollaboratorSearch from './collaborator-search';
 import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 // import { useToast } from '../ui/use-toast';
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/lib/hooks/use-toast"
 
 
 const WorkspaceCreator = () => {

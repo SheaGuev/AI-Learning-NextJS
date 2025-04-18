@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import 'quill/dist/quill.snow.css';
 import { TOOLBAR_OPTIONS } from '../types';
 import SlashCommands from '../extensions/slash-commands';
-import { registerCustomBlocks } from '../extensions/custom-blocks';
+import * as CustomBlocks from '../extensions/blocks/custom-blocks';
 // import { registerFlashcardBlot } from '../extensions/flashcard-blot';
 import '../styles/slash-commands.css';
 import '../styles/checkbox.css';
 import '../styles/flashcard.css';
 import '../styles/quiz.css';
 import '../styles/markdown-table.css';
-import { initializeCheckboxes } from '../extensions/checkbox-blot';
 // import QuillMarkdown from 'quilljs-markdown';
 import MarkdownTable, { registerMarkdownTable } from '../extensions/markdown-table';
 
@@ -63,8 +62,8 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
           // Register slash commands module
           Quill.register('modules/slashCommands', SlashCommands);
           
-          // Register custom blocks
-          registerCustomBlocks(Quill);
+          // Register custom blocks using the namespace
+          CustomBlocks.registerCustomBlocks(Quill);
           
           // Register markdown table module and get the blot for reference
           const TableBlot = registerMarkdownTable(Quill);
@@ -534,6 +533,7 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
               },
               // Add markdown table support
               markdownTable: {},
+              markdown: false
             },
             placeholder: 'Start writing or type "/" for commands...',
             formats: [
@@ -545,6 +545,7 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
             ],
           });
           
+          // RE-ADD Initialization of external quilljs-markdown library
           // Initialize markdown support
           const markdownOptions = {
             ignoreTags: ['pre', 'strikethrough'],
@@ -554,71 +555,7 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
             breaks: true,
             indentedCodeBlock: true,
             linkify: true,
-            typographer: true,
-            // Define custom rules if needed
-            customRules: [
-              // Handle indented lists
-              {
-                name: 'indent-list',
-                level: 'block',
-                start(src: string) { return src.match(/^[\s\t]+[-*+]/)?.index || -1; },
-                tokenizer(src: string) {
-                  const match = src.match(/^([\s\t]+)([-*+])\s+(.+)$/);
-                  if (match) {
-                    return {
-                      type: 'indent-list',
-                      raw: match[0],
-                      indent: match[1].length,
-                      content: match[3],
-                      tokens: []
-                    };
-                  }
-                  return undefined;
-                },
-                renderer(token: any) {
-                  // Calculate the list indentation level - each 2 spaces = 1 indent level
-                  const indentLevel = Math.floor(token.indent / 2);
-                  return {
-                    insert: token.content,
-                    attributes: {
-                      list: 'bullet',
-                      indent: indentLevel
-                    }
-                  };
-                }
-              },
-              // Handle indented numbered lists
-              {
-                name: 'indent-numbered-list',
-                level: 'block',
-                start(src: string) { return src.match(/^[\s\t]+\d+\./)?.index || -1; },
-                tokenizer(src: string) {
-                  const match = src.match(/^([\s\t]+)(\d+)\.\s+(.+)$/);
-                  if (match) {
-                    return {
-                      type: 'indent-numbered-list',
-                      raw: match[0],
-                      indent: match[1].length,
-                      number: match[2],
-                      content: match[3],
-                      tokens: []
-                    };
-                  }
-                  return undefined;
-                },
-                renderer(token: any) {
-                  // Calculate the list indentation level - each 2 spaces = 1 indent level
-                  const indentLevel = Math.floor(token.indent / 2);
-                  return {
-                    insert: token.content,
-                    attributes: {
-                      list: 'ordered',
-                      indent: indentLevel
-                    }
-                  };
-                }
-              }
-            ]
+            typographer: true
           };
           
           // Create and initialize the markdown module
@@ -634,18 +571,20 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
               clearTimeout((q as any).markdownTimeout);
               (q as any).markdownTimeout = setTimeout(() => {
                 try {
-                  if (markdownModule && typeof markdownModule.process === 'function') {
-                    markdownModule.process();
+                  // Check if the module instance still exists
+                  const currentMarkdownModule = (q as any).markdownModule;
+                  if (currentMarkdownModule && typeof currentMarkdownModule.process === 'function') {
+                    console.log('Processing markdown via editor-change listener...');
+                    currentMarkdownModule.process();
                   }
                 } catch (err) {
-                  console.error('Error in markdown processing:', err);
+                  console.error('Error in markdown processing listener:', err);
                 }
-              }, 200);
+              }, 200); // Adjusted debounce time slightly
             }
           });
           
           // Initialize checkbox support
-          initializeCheckboxes(q);
           
           // Add custom handler for markdown-style checkboxes
           q.keyboard.addBinding({
@@ -888,4 +827,4 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
   }, [wrapperRef]);
   
   return { quill };
-}; 
+};

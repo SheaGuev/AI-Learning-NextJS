@@ -4,7 +4,7 @@ import { useSocket } from '@/lib/providers/socket-provider';
 import { findUser } from '@/supabase/queries';
 import { createBClient } from '@/lib/server-actions/createClient';
 import { Collaborator } from '../types';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 
 export const useCollaboration = (quill: any, fileId: string) => {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);

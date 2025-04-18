@@ -32,7 +32,7 @@ Format your response using proper Markdown syntax following these guidelines:
 1. Use proper paragraph breaks with a blank line between paragraphs
 2. For bullet lists, use * with a space after it, and place each item on a new line
 3. For numbered lists, use 1. 2. 3. with a space after the period
-4. For nested lists, indent with 2 spaces (not tabs) before the * or number
+4. For nested lists, indent with 1 space (not tabs) before the * or number
 5. For code blocks, use triple backticks (\`\`\`) on separate lines before and after the code
 6. For inline code, surround with single backticks (\`)
 7. For headings, use # with a space after it (## for heading 2, ### for heading 3)
@@ -151,149 +151,141 @@ Format your response using proper Markdown syntax following these guidelines:
   }
   
   /**
-   * Helper to manage Markdown processing and ensure re-rendering
+   * Safe text insertion with improved markdown handling
    */
-  static ensureMarkdownProcessed(quill: any): void {
-    if (!quill) return;
-    
-    try {
-      // Get the markdown module
-      const markdownModule = quill.getModule('markdown');
-      
-      if (!markdownModule) {
-        console.log('No markdown module found');
+  static safeInsertText(quill: any, index: number, text: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!quill) {
+        reject(new Error('Quill not available'));
         return;
       }
       
-      console.log('Ensuring markdown is processed');
+      // Get markdown module and track its state
+      const markdownModule = quill.getModule('markdown');
+      const wasEnabled = markdownModule?.options?.enabled || false;
       
-      // First, make sure it's enabled
-      if (markdownModule.options) {
-        markdownModule.options.enabled = true;
-      }
-      
-      // Try to force processing through different approaches
-      
-      // 1. If the module has a process function, call it
-      if (typeof markdownModule.process === 'function') {
-        try {
-          console.log('Calling markdown process method');
-          markdownModule.process();
-        } catch (err) {
-          console.error('Error calling markdown process method:', err);
-        }
-      }
-      
-      // 2. If the module has an activity with an onTextChange method, call it
-      if (markdownModule.activity && typeof markdownModule.activity.onTextChange === 'function') {
-        try {
-          console.log('Calling markdown onTextChange method');
-          markdownModule.activity.onTextChange();
-        } catch (err) {
-          console.error('Error calling markdown onTextChange method:', err);
-        }
-      }
-      
-      // 3. Force a small edit and undo it to trigger text-change event
-      const range = quill.getSelection();
-      if (range) {
-        console.log('Triggering text-change with dummy edit');
-        
-        // Store the original content at this position
-        const originalContent = quill.getText(range.index, 1);
-        
-        // Make a small change
-        quill.insertText(range.index, ' ', 'api');
-        
-        // And undo it right away
-        quill.deleteText(range.index, 1, 'api');
-        
-        // Restore anything we might have overwritten
-        if (originalContent) {
-          quill.insertText(range.index, originalContent, 'api');
+      try {
+        // Temporarily disable markdown processing to prevent premature processing
+        if (markdownModule && markdownModule.options) {
+          markdownModule.options.enabled = false;
         }
         
-        // Reset selection
-        quill.setSelection(range.index, 0);
-      }
-      
-      console.log('Markdown processing completed');
-    } catch (err) {
-      console.error('Error in ensureMarkdownProcessed:', err);
-    }
-  }
-  
-  /**
-   * Safe text insertion with debouncing
-   */
-  static safeInsertText(quill: any, index: number, text: string): void {
-    if (!quill) return;
-    
-    // Get markdown module and ensure it's enabled
-    const markdownModule = quill.getModule('markdown');
-    const wasEnabled = markdownModule?.options?.enabled;
-    
-    try {
-      // Insert with a small delay to make sure DOM has settled
-      setTimeout(() => {
-        try {
-          // Check if the editor is still valid
-          if (!quill || !quill.root) {
-            console.error('Quill editor is no longer valid');
-            return;
-          }
-          
-          // Ensure the index is valid
-          const length = quill.getLength();
-          if (index < 0 || index > length) {
-            console.warn(`Invalid insertion index: ${index}, adjusting to valid range`);
-            index = Math.max(0, Math.min(index, length));
-          }
-          
-          // Insert the text
-          quill.insertText(index, text, 'user');
-          
-          // Focus the editor
-          quill.focus();
-          
-          // Set selection after the inserted text
-          quill.setSelection(index + text.length, 0);
-          
-          // Add a small delay before processing markdown
-          setTimeout(() => {
-            // Explicitly trigger markdown processing after insertion
-            ContentFormatter.ensureMarkdownProcessed(quill);
-          }, 50);
-          
-          console.log('Text inserted successfully at position', index);
-        } catch (error) {
-          console.error('Error in delayed text insertion:', error);
-          
-          // Try a fallback insertion method
+        // Ensure proper line breaks for lists to improve markdown parsing
+        let processedText = text;
+        
+        // Insert with adequate delay to ensure DOM has settled
+        setTimeout(() => {
           try {
-            console.log('Attempting fallback insertion method');
-            
-            // Get the current selection
-            const range = quill.getSelection();
-            if (range) {
-              // Insert at current selection
-              quill.insertText(range.index, text, 'user');
-              quill.setSelection(range.index + text.length, 0);
-            } else {
-              // Insert at beginning
-              quill.insertText(0, text, 'user');
-              quill.setSelection(text.length, 0);
+            // Check if the editor is still valid
+            if (!quill || !quill.root) {
+              console.error('Quill editor is no longer valid');
+              reject(new Error('Quill editor not available'));
+              return;
             }
             
-            // Process markdown
-            ContentFormatter.ensureMarkdownProcessed(quill);
-          } catch (fallbackError) {
-            console.error('Fallback insertion also failed:', fallbackError);
+            // Ensure the index is valid
+            const length = quill.getLength();
+            if (index < 0 || index > length) {
+              console.warn(`Invalid insertion index: ${index}, adjusting to valid range`);
+              index = Math.max(0, Math.min(index, length));
+            }
+            
+            // Preserve and save the selection
+            const originalRange = quill.getSelection();
+            
+            // Insert the processed text
+            quill.insertText(index, processedText, 'user');
+            
+            // Focus the editor
+            quill.focus();
+            
+            // Set selection after the inserted text
+            const targetIndex = Math.min(index + processedText.length, quill.getLength());
+            quill.setSelection(targetIndex, 0);
+            
+            // Re-enable markdown processing (if it was disabled - which it isn't currently)
+            if (markdownModule && markdownModule.options && wasEnabled) {
+              markdownModule.options.enabled = true;
+            }
+            
+            // Markdown processing is handled by the editor-change listener setup in use-editor-setup
+            // No need to call ensureMarkdownProcessed here
+            /*
+            setTimeout(() => {
+              // Process markdown - REMOVED
+              // ContentFormatter.ensureMarkdownProcessed(quill);
+              
+              // Restore selection if needed
+              if (originalRange) {
+                // Ensure the index is still valid before setting selection
+                const currentLength = quill.getLength();
+                const targetIndex = Math.min(index + processedText.length, currentLength);
+                quill.setSelection(targetIndex, 0);
+              }
+              
+              // Mark as complete
+              console.log('Text insertion and markdown processing completed');
+              resolve();
+            }, 150); // Single processing delay
+            */
+           
+            // Resolve immediately after insertion
+            console.log('Text insertion completed. Markdown processing handled by listener.');
+            resolve();
+            
+          } catch (error) {
+            console.error('Error in text insertion:', error);
+            
+            // Try a fallback insertion method
+            try {
+              console.log('Attempting fallback insertion method');
+              
+              // Re-enable markdown (if it was disabled)
+              if (markdownModule && markdownModule.options && wasEnabled) {
+                markdownModule.options.enabled = true;
+              }
+              
+              // Get the current selection
+              const range = quill.getSelection();
+              if (range) {
+                // Insert at current selection
+                quill.insertText(range.index, processedText, 'user');
+                quill.setSelection(range.index + processedText.length, 0);
+              } else {
+                // Insert at beginning
+                quill.insertText(0, processedText, 'user');
+                quill.setSelection(processedText.length, 0);
+              }
+              
+              // Markdown processing is handled by the editor-change listener
+              // No need for explicit calls here
+              /*
+              ContentFormatter.ensureMarkdownProcessed(quill);
+              setTimeout(() => {
+                ContentFormatter.ensureMarkdownProcessed(quill);
+                resolve();
+              }, 100);
+              */
+             
+              console.log('Fallback insertion completed. Markdown processing handled by listener.');
+              resolve(); // Resolve after successful fallback insertion
+              
+            } catch (fallbackError) {
+              console.error('Fallback insertion also failed:', fallbackError);
+              reject(fallbackError);
+            }
           }
+        }, 100); // Initial insertion delay
+      } catch (error) {
+        console.error('Error in safeInsertText setup:', error);
+        
+        // Re-enable markdown processing if it was enabled
+        if (markdownModule && markdownModule.options) {
+          markdownModule.options.enabled = wasEnabled;
         }
-      }, 50);
-    } catch (error) {
-      console.error('Error in safeInsertText:', error);
-    }
+        
+        reject(error);
+      }
+    });
   }
 } 

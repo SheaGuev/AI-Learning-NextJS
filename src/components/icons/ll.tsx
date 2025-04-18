@@ -2,7 +2,7 @@ import Image from 'next/image'
 import * as Logo from './ll.png';
 
  
-export default function ll() {
+export default function Ll() {
   return (
     <Image
       src={Logo}

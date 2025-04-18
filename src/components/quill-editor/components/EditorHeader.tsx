@@ -6,7 +6,7 @@ import { FiDownload, FiLoader, FiPlus, FiDatabase, FiSave } from 'react-icons/fi
 import UserAvatars from './UserAvatars';
 import { extractFlashcardsFromDocument, extractQuizzesFromDocument } from '@/lib/knowledge-base';
 import { useSupabaseUser } from '@/lib/providers/supabase-user-provider';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import Link from 'next/link';
 import { getFolderDetails, getFileDetails } from '@/supabase/queries';
 

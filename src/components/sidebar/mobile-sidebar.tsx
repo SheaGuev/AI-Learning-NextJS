@@ -15,7 +15,7 @@ export const nativeNavigations = [
     customIcon: Menu,
   },
   {
-    title: 'Pages',
+    title: 'Lateral Learning',
     id: 'pages',
     customIcon: ll,
   },
