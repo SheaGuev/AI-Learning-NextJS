@@ -16,5 +16,5 @@ export * from './ui';
 export * from './commands/slash-commands';
 
 // Re-export original components directly until they're moved
-export * from './flashcard-blot';
-export * from './quiz-blot';
+// export * from './flashcard-blot';
+// export * from './quiz-blot';
