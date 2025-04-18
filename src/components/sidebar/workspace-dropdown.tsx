@@ -54,12 +54,12 @@ const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
     <div
       className=" relative inline-block
       text-left scrollbar-thin over over
-      w-full
+      w-full 
   "
     >
       <div>
         <span onClick={() => setIsOpen(!isOpen)}
-              className="text-base cursor-pointer">
+              className="text-base cursor-pointer text-gray-50 ">
           {selectedOption ? (
             <SelectedWorkspace workspace={selectedOption} />
           ) : (

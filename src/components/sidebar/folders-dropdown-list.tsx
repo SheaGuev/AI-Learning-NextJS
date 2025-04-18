@@ -107,11 +107,11 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
         items-center 
         pr-4 
         pl-2
-        text-Neutrals/neutrals-8
+        text-neutral-100
   "
       >
         <span
-          className="text-Neutrals-8 
+          className="text-neutral-300
         font-bold 
         text-sm"
         >

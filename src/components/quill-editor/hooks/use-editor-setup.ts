@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import Quill from 'quill';
+// import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import { TOOLBAR_OPTIONS } from '../types';
 import SlashCommands from '../extensions/slash-commands';
@@ -49,7 +49,7 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
         
         try {
           // Import Quill and its modules
-          // const Quill = (await import('quill')).default;
+          const Quill = (await import('quill')).default;
           const QuillCursors = (await import('quill-cursors')).default;
           // Import markdown module
           const QuillMarkdown = (await import('quilljs-markdown')).default;

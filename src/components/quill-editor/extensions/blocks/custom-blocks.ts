@@ -1,7 +1,7 @@
 // Custom block formats for Quill
 import { CheckboxBlot, registerCheckboxBlot } from './checkbox-blot';
-import { FlashcardBlot, registerFlashcardBlot } from './flashcard-blot';
-import { QuizBlot, registerQuizBlot } from './quiz-blot'; // Removed .ts extension
+import { FlashcardBlot, registerFlashcardBlot } from './flashcard-blot'; // Commented out
+import { QuizBlot, registerQuizBlot } from '../quiz-blot'; // Corrected import path
 import SlashCommands from '../commands/slash-commands'; // Removed .ts extension
 
 // We'll need to register these with Quill when we import them

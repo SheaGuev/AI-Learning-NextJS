@@ -26,8 +26,9 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
             className="group/native
             flex
             items-center
+            text-neutral-100
             text-Neutrals/neutrals-9
-            hover:text-Neutrals/neutrals-3
+            hover:text-white
             transition-all
             gap-3
           "
@@ -43,8 +44,8 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
             className="group/native
             flex
             items-center
-            text-Neutrals/neutrals-9
-            hover:text-Neutrals/neutrals-3
+             text-neutral-100
+            hover:text-white
             transition-all
             gap-3
             cursor-pointer
@@ -60,8 +61,8 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
             className="group/native
             flex
             items-center
-            text-Neutrals/neutrals-9
-            hover:text-Neutrals/neutrals-3
+            text-neutral-100
+            hover:text-white
             transition-all
             gap-3
           "
@@ -74,5 +75,8 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
     </nav>
   );
 };
+
+// text-Neutrals/neutrals-9
+//             hover:text-Neutrals/neutrals-3
 
 export default NativeNavigation;
