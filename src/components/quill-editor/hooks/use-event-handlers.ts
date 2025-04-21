@@ -32,6 +32,7 @@ export const useEventHandlers = (
 ) => {
   const { toast } = useToast();
   const { extractFullText, handlePdfSectionSummary, formatPdfContent } = usePDFProcessor(quill, generateText);
+  const Delta = quill ? quill.constructor.import('delta') : null; // Import Delta constructor
 
   // Handle AI generation for text
   const handleAIGenerate = useCallback(async (prompt: string, length: string, pdfText?: string) => {
@@ -596,7 +597,7 @@ export const useEventHandlers = (
 
   // Set up event handlers when quill is ready
   useEffect(() => {
-    if (!quill) return;
+    if (!quill || !Delta) return; // Ensure Quill and Delta are available
     
     const handleAIGenerateEvent = (e: any) => {
       const { range } = e.detail;
@@ -612,24 +613,37 @@ export const useEventHandlers = (
       }
     };
     
-    // Add event listener to the quill root element
-    quill.root.addEventListener('ai-generate', handleAIGenerateEvent);
-    
     // Set up event handlers for component-specific events
-    const handleDirectSaveRequest = (e: any) => {
-      console.log('Handling direct save request event');
-      const { quill: componentQuill } = e.detail;
-      
-      // Only handle if this is for our quill instance
-      if (componentQuill === quill) {
-        // Create minimal delta to trigger save
-        const delta = {
-          ops: [{ retain: quill.getLength() - 1 }]
-        };
-        const oldDelta = quill.getContents();
+    const handleDirectSaveRequest = (e: Event) => {
+      console.log('Handling direct save request event', e.target);
+
+      const targetNode = e.target as Node;
+      if (quill && quill.root.contains(targetNode)) {
+        const blot = quill.constructor.find(targetNode);
         
-        // Call the quill handler directly
-        quillHandler(delta, oldDelta, 'user');
+        if (blot && blot.statics?.blotName) { // Simplified check: just need the blot
+          try {
+            // --- Trigger updateContents with empty delta and 'user' source --- 
+            console.log(`Event originated from this Quill instance (${blot.statics.blotName}). Triggering updateContents with source 'user'.`);
+            quill.updateContents(new Delta(), 'user'); // Force update check as 'user'
+            // --- End of Approach ---
+
+          } catch (error) {
+            console.error(`Error triggering updateContents for ${blot.statics.blotName} save request:`, error);
+            // Fallback if updateContents fails - trigger quillHandler directly
+            const delta = new Delta().retain(quill.getLength()); // Minimal delta
+            const oldDelta = quill.getContents();
+            quillHandler(delta, oldDelta, 'user');
+          }
+        } else {
+          console.warn('Could not find blot for save request. Using fallback.');
+          // Fallback if blot info is incomplete - trigger quillHandler directly
+          const delta = new Delta().retain(quill.getLength()); // Minimal delta
+          const oldDelta = quill.getContents();
+          quillHandler(delta, oldDelta, 'user');
+        }
+      } else {
+         console.warn('Save request event ignored. Origin not within this Quill instance.', { target: targetNode, quillRoot: quill?.root });
       }
     };
     
@@ -886,10 +900,11 @@ ${section.content}`;
     formatPdfContent,
     setCurrentRange,
     setShowAPIKeyDialog,
-    setShowAIPrompt
+    setShowAIPrompt,
+    Delta // Add Delta to dependencies
   ]);
 
   return {
     handleAIGenerate
   };
-}; 
+};

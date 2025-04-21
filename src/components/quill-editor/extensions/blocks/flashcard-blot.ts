@@ -50,7 +50,7 @@ export const FlashcardBlot: FlashcardBlotStatic = {
     // Add AI generate button
     const generateButton = document.createElement('button');
     generateButton.className = 'ql-flashcard-nav-btn ql-flashcard-generate';
-    generateButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`;
+    generateButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1-1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`;
     generateButton.title = 'Generate flashcards with AI';
 
     // Add PDF upload button
@@ -546,7 +546,7 @@ export const FlashcardBlot: FlashcardBlotStatic = {
         
         // Add AI icon to title
         const titleIcon = document.createElement('span');
-        titleIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`;
+        titleIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1-1.275 1.275L12 21l1.912-5.813a2 2 0 0 1-1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`;
         
         title.prepend(titleIcon);
         
@@ -1119,18 +1119,132 @@ export const FlashcardBlot: FlashcardBlotStatic = {
     
     // Listen for update events to handle AI-generated content
     node.addEventListener('flashcard-update', (e: any) => {
-      // Implementation details omitted for brevity
+      const { cards: newCards, currentIndex: newCurrentIndex = 0, isFlipped: newIsFlipped = false } = e.detail;
+
+      if (!Array.isArray(newCards) || newCards.length === 0) {
+        console.error('Invalid card data received in flashcard-update event:', e.detail);
+        return;
+      }
+
+      // Find the closest Quill instance
+      let quillInstance;
+      try {
+        quillInstance = (node.closest('.ql-container') as any)?.['__quill'];
+      } catch (err) {
+        // Ignore errors here
+      }
+
+      // Wrap the update in markdown safety
+      withDisabledMarkdown(quillInstance || Quill, () => {
+        // Clear existing cards from the container
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+
+        // Re-create card elements
+        newCards.forEach((card: { front: string; back: string }, index: number) => {
+          // Front side
+          const front = document.createElement('div');
+          front.className = 'ql-flashcard-front';
+          front.dataset.cardIndex = index.toString();
+          front.style.display = index === newCurrentIndex ? 'block' : 'none';
+          
+          const frontLabel = document.createElement('div');
+          frontLabel.className = 'ql-flashcard-label';
+          frontLabel.textContent = 'FRONT';
+          
+          const frontContent = document.createElement('div');
+          frontContent.className = 'ql-flashcard-content';
+          frontContent.setAttribute('contenteditable', 'true');
+          frontContent.innerHTML = card.front || 'Enter your question here...';
+          
+          // Add keyboard event handlers for front content
+          frontContent.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' && !ev.shiftKey) {
+              ev.stopPropagation();
+              ev.preventDefault();
+              document.execCommand('insertLineBreak');
+            }
+            if (ev.key === 'Delete' || ev.key === 'Backspace') {
+              if (frontContent.innerText.length === 0 || window.getSelection()?.toString() === frontContent.innerText) {
+                ev.preventDefault();
+              }
+              ev.stopPropagation();
+            }
+          });
+          
+          front.appendChild(frontLabel);
+          front.appendChild(frontContent);
+          
+          // Back side
+          const back = document.createElement('div');
+          back.className = 'ql-flashcard-back';
+          back.dataset.cardIndex = index.toString();
+          back.style.display = index === newCurrentIndex ? 'block' : 'none';
+          
+          const backLabel = document.createElement('div');
+          backLabel.className = 'ql-flashcard-label';
+          backLabel.textContent = 'BACK';
+          
+          const backContent = document.createElement('div');
+          backContent.className = 'ql-flashcard-content';
+          backContent.setAttribute('contenteditable', 'true');
+          backContent.innerHTML = card.back || 'Write the answer here...';
+          
+          // Add keyboard event handlers for back content
+          backContent.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' && !ev.shiftKey) {
+              ev.stopPropagation();
+              ev.preventDefault();
+              document.execCommand('insertLineBreak');
+            }
+            if (ev.key === 'Delete' || ev.key === 'Backspace') {
+              if (backContent.innerText.length === 0 || window.getSelection()?.toString() === backContent.innerText) {
+                ev.preventDefault();
+              }
+              ev.stopPropagation();
+            }
+          });
+          
+          back.appendChild(backLabel);
+          back.appendChild(backContent);
+          
+          // Add elements to container
+          container.appendChild(front);
+          container.appendChild(back);
+        });
+
+        // Update dataset and navigation
+        container.dataset.currentIndex = newCurrentIndex.toString();
+        container.dataset.totalCards = newCards.length.toString();
+        
+        // Update flip state
+        if (newIsFlipped) {
+          container.classList.add('flipped');
+        } else {
+          container.classList.remove('flipped');
+        }
+
+        // Update navigation display
+        updateNavInfo();
+
+        // Trigger a save operation by dispatching an event
+        const saveEvent = new CustomEvent('flashcard-save-needed', {
+          bubbles: true
+        });
+        node.dispatchEvent(saveEvent);
+      });
     });
     
     return node;
   },
 
   value(node: HTMLElement) {
-    const container = node.querySelector('.ql-flashcard-container');
+    const container = node.querySelector('.ql-flashcard-container') as HTMLElement; // Cast to HTMLElement
     if (!container) return { cards: [], currentIndex: 0, isFlipped: false };
     
     // Get current index
-    const currentIndex = parseInt(container.dataset.currentIndex || '0');
+    const currentIndex = parseInt(container.dataset.currentIndex || '0'); // Now type-safe
     
     // Check if flashcard is flipped
     const isFlipped = container.classList.contains('flipped');

@@ -210,24 +210,7 @@ Format your response using proper Markdown syntax following these guidelines:
             
             // Markdown processing is handled by the editor-change listener setup in use-editor-setup
             // No need to call ensureMarkdownProcessed here
-            /*
-            setTimeout(() => {
-              // Process markdown - REMOVED
-              // ContentFormatter.ensureMarkdownProcessed(quill);
-              
-              // Restore selection if needed
-              if (originalRange) {
-                // Ensure the index is still valid before setting selection
-                const currentLength = quill.getLength();
-                const targetIndex = Math.min(index + processedText.length, currentLength);
-                quill.setSelection(targetIndex, 0);
-              }
-              
-              // Mark as complete
-              console.log('Text insertion and markdown processing completed');
-              resolve();
-            }, 150); // Single processing delay
-            */
+            
            
             // Resolve immediately after insertion
             console.log('Text insertion completed. Markdown processing handled by listener.');
@@ -259,13 +242,7 @@ Format your response using proper Markdown syntax following these guidelines:
               
               // Markdown processing is handled by the editor-change listener
               // No need for explicit calls here
-              /*
-              ContentFormatter.ensureMarkdownProcessed(quill);
-              setTimeout(() => {
-                ContentFormatter.ensureMarkdownProcessed(quill);
-                resolve();
-              }, 100);
-              */
+              
              
               console.log('Fallback insertion completed. Markdown processing handled by listener.');
               resolve(); // Resolve after successful fallback insertion
