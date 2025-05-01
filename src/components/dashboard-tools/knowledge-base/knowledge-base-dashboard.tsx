@@ -1770,19 +1770,21 @@ const KnowledgeBaseDashboard: React.FC = () => {
       {/* Navigation/Filter Bar */}
       {!isStudyMode && (
         <div className="mb-6 border-b border-[#2d2d3a] pb-4">
-          <div className="flex flex-wrap items-center justify-between mb-4">
+          {/* Changed: Added flex-col md:flex-row and items-start md:items-center */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4 md:gap-0">
             <h2 className="text-2xl font-bold text-white">Knowledge Base</h2>
             
-            <div className="flex items-center gap-2">
+            {/* Changed: Added flex-wrap */}
+            <div className="flex flex-wrap items-center gap-2">
               {selectionMode ? (
                 <>
-                  <div className="flex items-center">
+                  <div className="flex flex-wrap items-center gap-2"> {/* Changed: Added flex-wrap and gap-2 */}
                     <span className="text-sm text-gray-300 mr-2">
                       {selectedItems.length} selected
                     </span>
                     {selectedItems.length > 0 && (
                       <button
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center mr-2"
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center" // Removed mr-2
                         onClick={handleBulkDeleteConfirm}
                       >
                         <FiTrash2 className="mr-2" />
@@ -1791,7 +1793,7 @@ const KnowledgeBaseDashboard: React.FC = () => {
                     )}
                     {selectedItems.length > 0 && (
                       <button
-                        className="px-4 py-2 bg-[#6052A8] text-white rounded-lg hover:bg-[#7262B8] flex items-center mr-2"
+                        className="px-4 py-2 bg-[#6052A8] text-white rounded-lg hover:bg-[#7262B8] flex items-center" // Removed mr-2
                         onClick={() => setShowBulkTagModal(true)}
                       >
                         <FiTag className="mr-2" />
@@ -1799,7 +1801,7 @@ const KnowledgeBaseDashboard: React.FC = () => {
                       </button>
                     )}
                   </div>
-                  <div className="flex space-x-2 mr-2">
+                  <div className="flex space-x-2"> {/* Removed mr-2 */}
                     <button
                       className="px-3 py-2 bg-[#2d2d3a] text-gray-300 rounded hover:bg-[#3d3d4d] text-sm"
                       onClick={selectAll}
@@ -1826,7 +1828,7 @@ const KnowledgeBaseDashboard: React.FC = () => {
               ) : (
                 <>
                   <button
-                    className="px-4 py-2 bg-[#2d2d3a] text-gray-300 rounded-lg hover:bg-[#3d3d4d] flex items-center mr-2"
+                    className="px-4 py-2 bg-[#2d2d3a] text-gray-300 rounded-lg hover:bg-[#3d3d4d] flex items-center" // Removed mr-2
                     onClick={() => setSelectionMode(true)}
                   >
                     <FiCheck className="mr-2" />
@@ -1834,7 +1836,7 @@ const KnowledgeBaseDashboard: React.FC = () => {
                   </button>
                   
                   <button
-                    className="px-4 py-2 bg-[#2d2d3a] text-gray-300 rounded-lg hover:bg-[#3d3d4d] flex items-center mr-2"
+                    className="px-4 py-2 bg-[#2d2d3a] text-gray-300 rounded-lg hover:bg-[#3d3d4d] flex items-center" // Removed mr-2
                     onClick={() => setShowStudySettingsModal(true)}
                     title="Study Settings"
                   >
@@ -1955,4 +1957,4 @@ const KnowledgeBaseDashboard: React.FC = () => {
   );
 };
 
-export default KnowledgeBaseDashboard; 
+export default KnowledgeBaseDashboard;

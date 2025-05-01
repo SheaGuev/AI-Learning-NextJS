@@ -2,12 +2,11 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import db from "../supabase/db";
-import { ThemeProvider } from "@/lib/providers/theme-provider"
+import { ThemeProvider } from "@/lib/providers/theme-provider";
 import { SupabaseUserProvider } from "@/lib/providers/supabase-user-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { SocketProvider } from "@/lib/providers/socket-provider";
-
-
+import { PomodoroProvider } from "@/lib/providers/pomodoro-provider"; // Import PomodoroProvider
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,20 +28,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-
-  // console.log(db);
-  // return (
-  //   <html lang="en">
-  //     <body
-  //       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-  //     >
-  //       {children}
-  //     </body>
-  //   </html>
-  // );
-
-
-// export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <>
       <html lang="en" suppressHydrationWarning>
@@ -56,15 +41,17 @@ export default function RootLayout({
           >
             <SupabaseUserProvider>
               <SocketProvider>
-                {children}
-                <Toaster />
+                <PomodoroProvider> {/* Wrap with PomodoroProvider */}
+                  {children}
+                  <Toaster />
+                </PomodoroProvider>
               </SocketProvider>
             </SupabaseUserProvider>
           </ThemeProvider>
         </body>
       </html>
     </>
-  )
+  );
 }
 
 

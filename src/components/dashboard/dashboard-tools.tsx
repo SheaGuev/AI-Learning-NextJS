@@ -5,10 +5,11 @@ import AiTutor from '@/components/dashboard-tools/ai-tutor/ai-tutor';
 import { LearningPathPlanner } from '@/components/dashboard-tools/learning-path/learning-path-planner';
 import ResearchTool from '@/components/dashboard-tools/research/research-tool';
 import KnowledgeBaseDashboard from '@/components/dashboard-tools/knowledge-base/knowledge-base-dashboard';
-import { RiRobot2Line, RiCodeLine, RiRoadMapLine, RiSearchLine, RiBrainLine } from 'react-icons/ri';
+import PomodoroTimer from '@/components/dashboard-tools/pomodoro-timer/pomodoro-timer';
+import { RiRobot2Line, RiCodeLine, RiRoadMapLine, RiSearchLine, RiBrainLine, RiTimerLine } from 'react-icons/ri';
 
 // Tool types
-type ToolType = 'ai-tutor' | 'flashcard-quiz' | 'learning-path' | 'research' | 'knowledge-base' | null;
+type ToolType = 'ai-tutor' | 'flashcard-quiz' | 'learning-path' | 'research' | 'knowledge-base' | 'pomodoro-timer' | null;
 
 interface ToolCardProps {
   title: string;
@@ -61,6 +62,12 @@ const DashboardTools: React.FC = () => {
       title: 'Research Tool',
       description: 'Find relevant sources and references',
       icon: <RiSearchLine />,
+    },
+    {
+      id: 'pomodoro-timer',
+      title: 'Pomodoro Timer',
+      description: 'Manage work and break sessions effectively',
+      icon: <RiTimerLine />,
     }
     // {
     //   id: 'flashcard-quiz',
@@ -80,6 +87,8 @@ const DashboardTools: React.FC = () => {
         return <ResearchTool />;
       case 'knowledge-base':
         return <KnowledgeBaseDashboard />;
+      case 'pomodoro-timer':
+        return <PomodoroTimer />;
       default:
         return null;
     }
@@ -87,7 +96,7 @@ const DashboardTools: React.FC = () => {
 
   return (
     <div className="flex flex-col space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {tools.map((tool) => (
           <ToolCard
             key={tool.id}
@@ -101,7 +110,7 @@ const DashboardTools: React.FC = () => {
       </div>
       
       {activeTool && (
-        <div className="mt-4 transition-all min-h-[600px] bg-[#1e1e2e] border border-[#4A4A67] rounded-lg p-6 shadow-lg">
+        <div className="mt-4 transition-all min-h-[300px] bg-[#1e1e2e] border border-[#4A4A67] rounded-lg p-6 shadow-lg flex justify-center items-start">
           {renderActiveTool()}
         </div>
       )}
@@ -109,4 +118,4 @@ const DashboardTools: React.FC = () => {
   );
 };
 
-export default DashboardTools; 
+export default DashboardTools;
