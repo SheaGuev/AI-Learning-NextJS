@@ -20,23 +20,23 @@ interface PDFJS {
 
 // Helper function to load PDF.js if not already loaded
 const loadPDFJS = async () => {
-  // Set the worker URL for the already loaded PDF.js from node_modules
+  // Check if PDF.js is already loaded
   if ((window as any).pdfjsLib) {
-    ((window as any).pdfjsLib as PDFJS).GlobalWorkerOptions.workerSrc = 
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdfjsLib = (window as any).pdfjsLib as PDFJS;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
     return;
   }
   
-  // Fallback to loading from CDN if not already loaded
+  // Fallback to loading from jsDelivr CDN if not already loaded
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement('script');
-    // Use stable version from CDN instead of directly from mozilla.github.io
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
     script.onload = () => {
       // Set the worker URL
       if ((window as any).pdfjsLib && 'GlobalWorkerOptions' in (window as any).pdfjsLib) {
         ((window as any).pdfjsLib as PDFJS).GlobalWorkerOptions.workerSrc = 
-          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
       }
       resolve();
     };
