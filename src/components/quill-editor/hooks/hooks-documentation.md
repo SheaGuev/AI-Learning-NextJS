@@ -39,6 +39,9 @@ Let's examine each hook in detail:
 #### Document Sync
 - Listens for changes from other users via socket
 - Updates the local Quill instance with remote changes
+- **Important**: This hook is the primary handler for `receive-changes` socket events
+  - A duplicate handler previously existed in `EditorWrapper.tsx` causing changes to be applied twice
+  - The duplicate handler has been removed to ensure changes are applied exactly once
 
 #### Presence Tracking
 - Uses Supabase Presence to track users in the document

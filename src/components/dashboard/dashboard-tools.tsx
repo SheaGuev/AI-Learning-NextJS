@@ -57,12 +57,12 @@ const DashboardTools: React.FC = () => {
       description: 'Get learning assistance with AI-powered tutoring',
       icon: <RiRobot2Line />,
     },
-    {
-      id: 'research',
-      title: 'Research Tool',
-      description: 'Find relevant sources and references',
-      icon: <RiSearchLine />,
-    },
+    // {
+    //   id: 'research',
+    //   title: 'Research Tool',
+    //   description: 'Find relevant sources and references',
+    //   icon: <RiSearchLine />,
+    // },
     {
       id: 'pomodoro-timer',
       title: 'Pomodoro Timer',
@@ -96,7 +96,7 @@ const DashboardTools: React.FC = () => {
 
   return (
     <div className="flex flex-col space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {tools.map((tool) => (
           <ToolCard
             key={tool.id}
@@ -110,7 +110,7 @@ const DashboardTools: React.FC = () => {
       </div>
       
       {activeTool && (
-        <div className="mt-4 transition-all min-h-[300px] bg-[#1e1e2e] border border-[#4A4A67] rounded-lg p-6 shadow-lg flex justify-center items-start">
+        <div className="mt-4 transition-all min-h-[300px] bg-[#1e1e2e] border border-[#4A4A67] rounded-lg p-6 shadow-lg">
           {renderActiveTool()}
         </div>
       )}

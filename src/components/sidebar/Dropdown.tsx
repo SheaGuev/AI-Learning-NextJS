@@ -38,7 +38,7 @@ const Dropdown: React.FC<DropdownProps> = ({
   ...props
 }) => {
   // Add debugging log to check listType when component renders
-  console.log(`Dropdown rendering: ${id} with listType=${listType}`);
+  // console.log(`Dropdown rendering: ${id} with listType=${listType}`);
   
   const supabase = createBClient();
   const { toast } = useToast();
@@ -50,13 +50,13 @@ const Dropdown: React.FC<DropdownProps> = ({
 
   // Add detailed debugging for context values
   useEffect(() => {
-    console.log("Dropdown context values:", { 
-      componentId: id,
-      listType,
-      contextWorkspaceId: workspaceId, 
-      contextFolderId: folderId,
-      pathname: window.location.pathname
-    });
+    // console.log("Dropdown context values:", { 
+    //   componentId: id,
+    //   listType,
+    //   contextWorkspaceId: workspaceId, 
+    //   contextFolderId: folderId,
+    //   pathname: window.location.pathname
+    // });
   }, [id, listType, workspaceId, folderId]);
   
   //folder Title synced with server data and local
@@ -137,7 +137,7 @@ const Dropdown: React.FC<DropdownProps> = ({
 
   // Modify the handleDoubleClick function to add debugging
   const handleDoubleClick = (e: React.MouseEvent) => {
-    console.log(`Double click detected on ${listType}`, { id, listType });
+    // console.log(`Double click detected on ${listType}`, { id, listType });
     e.preventDefault();
     e.stopPropagation();
     setIsEditing(true);
@@ -283,28 +283,28 @@ const Dropdown: React.FC<DropdownProps> = ({
     e.preventDefault(); // Prevent default browser behavior
     e.stopPropagation(); // Prevent event propagation
     
-    console.log('moveToTrash function called', { id, listType });
+    // console.log('moveToTrash function called', { id, listType });
     
     // Debug user context
-    console.log('User context:', { 
-      userExists: !!user, 
-      userEmail: user?.email,
-      userID: user?.id,
-      workspaceId 
-    });
+    // console.log('User context:', { 
+    //   userExists: !!user, 
+    //   userEmail: user?.email,
+    //   userID: user?.id,
+    //   workspaceId 
+    // });
     
     // Check if user is authenticated
     if (!user?.email || !workspaceId) {
-      console.log('Authentication error', { user, workspaceId });
+      // console.log('Authentication error', { user, workspaceId });
       
       // Try to get the current session directly
       try {
         const supabase = createBClient();
         const { data: sessionData } = await supabase.auth.getSession();
-        console.log('Current session check:', sessionData);
+        // console.log('Current session check:', sessionData);
         
         if (!sessionData.session) {
-          console.log('No active session found in moveToTrash');
+          // console.log('No active session found in moveToTrash');
           toast({
             title: 'Authentication Required',
             description: 'Please log in to move items to trash.',
@@ -325,10 +325,10 @@ const Dropdown: React.FC<DropdownProps> = ({
     }
     
     const pathId = id.split('folder');
-    console.log('Path ID after splitting', { pathId, originalId: id });
+    // console.log('Path ID after splitting', { pathId, originalId: id });
     
     if (listType === 'folder') {
-      console.log('Processing folder trash', { folderId: pathId[0] });
+      // console.log('Processing folder trash', { folderId: pathId[0] });
       
       try {
         const deletedByMessage = user?.email ? `Deleted by ${user.email}` : 'Deleted';
@@ -339,7 +339,7 @@ const Dropdown: React.FC<DropdownProps> = ({
           ?.folders.find((folder) => folder.id === pathId[0])
           ?.files.filter((file) => !file.inTrash) || [];
           
-        console.log(`Found ${folderFiles.length} files in folder to trash`, folderFiles);
+        // console.log(`Found ${folderFiles.length} files in folder to trash`, folderFiles);
         
         // 1. Update local state for the folder
         dispatch({
@@ -350,7 +350,7 @@ const Dropdown: React.FC<DropdownProps> = ({
             workspaceId,
           },
         });
-        console.log('Dispatch for folder completed');
+        // console.log('Dispatch for folder completed');
         
         // 2. Update local state for all files in the folder
         for (const file of folderFiles) {
@@ -363,14 +363,14 @@ const Dropdown: React.FC<DropdownProps> = ({
               fileId: file.id,
             },
           });
-          console.log(`Marked file ${file.id} as trashed in UI`);
+          // console.log(`Marked file ${file.id} as trashed in UI`);
         }
         
         // 3. Update folder in database
-        console.log('Calling updateFolder with', { 
-          inTrash: deletedByMessage, 
-          folderId: pathId[0] 
-        });
+        // console.log('Calling updateFolder with', { 
+        //   inTrash: deletedByMessage, 
+        //   folderId: pathId[0] 
+        // });
         
         const { data, error } = await updateFolder(
           { inTrash: deletedByMessage },
@@ -403,7 +403,7 @@ const Dropdown: React.FC<DropdownProps> = ({
             variant: 'default',
           });
         } else {
-          console.log('Folder and all files successfully moved to trash', data);
+          // console.log('Folder and all files successfully moved to trash', data);
           toast({
             title: 'Success',
             description: `Moved folder and ${folderFiles.length} files to trash`,
@@ -420,7 +420,7 @@ const Dropdown: React.FC<DropdownProps> = ({
     }
 
     if (listType === 'file') {
-      console.log('Processing file trash', { filePathId: pathId });
+      // console.log('Processing file trash', { filePathId: pathId });
       
       if (pathId.length !== 2 || !pathId[1]) {
         console.error('Invalid file ID format', { pathId });
@@ -434,11 +434,11 @@ const Dropdown: React.FC<DropdownProps> = ({
       
       try {
         // Update local state
-        console.log('Dispatching file update', { 
-          folderId: pathId[0],
-          fileId: pathId[1],
-          workspaceId
-        });
+        // console.log('Dispatching file update', { 
+        //   folderId: pathId[0],
+        //   fileId: pathId[1],
+        //   workspaceId
+        // });
         
         dispatch({
           type: 'UPDATE_FILE',
@@ -449,13 +449,13 @@ const Dropdown: React.FC<DropdownProps> = ({
             fileId: pathId[1],
           },
         });
-        console.log('Dispatch for file completed');
+        // console.log('Dispatch for file completed');
         
         // Update database
-        console.log('Calling updateFile with', { 
-          inTrash: `Deleted by ${user?.email}`, 
-          fileId: pathId[1] 
-        });
+        // console.log('Calling updateFile with', { 
+        //   inTrash: `Deleted by ${user?.email}`, 
+        //   fileId: pathId[1] 
+        // });
         
         const { data, error } = await updateFile(
           { inTrash: `Deleted by ${user?.email}` },
@@ -470,7 +470,7 @@ const Dropdown: React.FC<DropdownProps> = ({
             description: 'Could not move the file to trash',
           });
         } else {
-          console.log('File successfully moved to trash', data);
+          // console.log('File successfully moved to trash', data);
           toast({
             title: 'Success',
             description: 'Moved file to trash',
@@ -527,7 +527,7 @@ const Dropdown: React.FC<DropdownProps> = ({
       payload: { file: newFile, folderId: id, workspaceId },
     });
     
-    console.log("Created new file locally:", { fileId, folderId: id });
+    // console.log("Created new file locally:", { fileId, folderId: id });
 
     // Then create in database
     try {
@@ -551,7 +551,7 @@ const Dropdown: React.FC<DropdownProps> = ({
           }
         });
       } else {
-        console.log("File created successfully:", data);
+        // console.log("File created successfully:", data);
         toast({
           title: 'Success',
           description: 'File created.',
@@ -600,7 +600,7 @@ const Dropdown: React.FC<DropdownProps> = ({
   useEffect(() => {
     if (isAccordionOpen && listType === 'folder' && id && workspaceId && !recentlyAddedFile) {
       const fetchFolderFiles = async () => {
-        console.log('Fetching files for folder:', id);
+        // console.log('Fetching files for folder:', id);
         try {
           const { data, error } = await getFiles(id);
           if (error) {
@@ -609,7 +609,7 @@ const Dropdown: React.FC<DropdownProps> = ({
           }
           
           if (data && data.length > 0) {
-            console.log('Files found:', data.length);
+            // console.log('Files found:', data.length);
             
             // Check if we already have files in local state
             const existingFiles = state.workspaces
@@ -626,7 +626,7 @@ const Dropdown: React.FC<DropdownProps> = ({
               });
             }
           } else {
-            console.log('No files found for folder');
+            // console.log('No files found for folder');
           }
         } catch (err) {
           console.error('Exception fetching files:', err);
@@ -643,12 +643,12 @@ const Dropdown: React.FC<DropdownProps> = ({
       className={listStyles}
       onClick={async (e) => {
         // Log what element was actually clicked with proper type casting
-        console.log(`AccordionItem clicked: target=${(e.target as Element).tagName || 'unknown'}, currentTarget=${(e.currentTarget as Element).tagName || 'unknown'}`);
+        // console.log(`AccordionItem clicked: target=${(e.target as Element).tagName || 'unknown'}, currentTarget=${(e.currentTarget as Element).tagName || 'unknown'}`);
         
         // Only navigate if it's a direct click on the item, not on a child element
         if (e.target === e.currentTarget) {
           e.stopPropagation();
-          console.log(`Direct click on AccordionItem: navigating ${listType} with id=${id}`);
+          // console.log(`Direct click on AccordionItem: navigating ${listType} with id=${id}`);
           
           // For folder items, only navigate when clicking on the item itself
           if (listType === 'folder') {
@@ -667,7 +667,7 @@ const Dropdown: React.FC<DropdownProps> = ({
         disabled={false}
         onFocus={() => listType === 'folder' && setIsAccordionOpen(true)}
         onClick={async (e) => {
-          console.log(`AccordionTrigger clicked for ${listType}`, { id });
+          // console.log(`AccordionTrigger clicked for ${listType}`, { id });
           
           // Stop propagation for both folder and file clicks
           e.stopPropagation();
@@ -777,7 +777,7 @@ const Dropdown: React.FC<DropdownProps> = ({
             .map((file) => {
               // Create the composite ID properly to include the parent folder ID
               const customFileId = `${id}folder${file.id}`;
-              console.log(`Rendering file ${file.id} with customFileId=${customFileId}`);
+              // console.log(`Rendering file ${file.id} with customFileId=${customFileId}`);
               return (
                 <Dropdown
                   key={file.id}

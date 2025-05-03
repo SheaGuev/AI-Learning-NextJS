@@ -538,42 +538,7 @@ const SettingsForm = () => {
             Delete Workspace
           </Button>
         </Alert>
-        <p className="flex items-center gap-2 mt-6">
-          <UserIcon size={20} /> Profile
-        </p>
-        <Separator />
-        <div className="flex items-center">
-          <Avatar>
-            <AvatarImage src={''} />
-            <AvatarFallback>
-              <CgProfile />
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col ml-6">
-            <small className="text-muted-foreground cursor-not-allowed">
-              {user ? user.email : ''}
-            </small>
-            <Label
-              htmlFor="profilePicture"
-              className="text-sm text-muted-foreground"
-            >
-              Profile Picture
-            </Label>
-            <Input
-              name="profilePicture"
-              type="file"
-              accept="image/*"
-              placeholder="Profile Picture"
-              // onChange={onChangeProfilePicture}
-              disabled={uploadingProfilePic}
-            />
-          </div>
-        </div>
-        <MdLogout>
-          <div className="flex items-center">
-            <LogOut />
-          </div>
-        </MdLogout>
+        
         
         {/* API Keys Section */}
         <p className="flex items-center gap-2 mt-6">
@@ -614,71 +579,9 @@ const SettingsForm = () => {
             </p>
           </div>
           
-          <div>
-            <Label
-              htmlFor="googleSearchApiKey"
-              className="text-sm text-muted-foreground flex items-center gap-2"
-            >
-              Google Search API Key
-              <span className={`inline-block w-2 h-2 rounded-full ${apiKeyStatus.googleSearch ? 'bg-green-500' : 'bg-red-500'}`} title={apiKeyStatus.googleSearch ? 'API Key Set' : 'API Key Not Set'}></span>
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="googleSearchApiKey"
-                type="password"
-                placeholder="Enter your Google Search API key"
-                defaultValue={localStorage.getItem('google_search_api_key') || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  handleApiKeyChange('google_search_api_key', value);
-                }}
-              />
-              <a 
-                href="https://developers.google.com/custom-search/v1/overview" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-blue-500 hover:underline"
-              >
-                Get Key
-              </a>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Used for research and web search functionality
-            </p>
-          </div>
+
           
-          <div>
-            <Label
-              htmlFor="searchEngineId"
-              className="text-sm text-muted-foreground flex items-center gap-2"
-            >
-              Search Engine ID
-              <span className={`inline-block w-2 h-2 rounded-full ${apiKeyStatus.searchEngineId ? 'bg-green-500' : 'bg-red-500'}`} title={apiKeyStatus.searchEngineId ? 'Search Engine ID Set' : 'Search Engine ID Not Set'}></span>
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="searchEngineId"
-                type="text"
-                placeholder="Enter your Custom Search Engine ID"
-                defaultValue={localStorage.getItem('google_search_engine_id') || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  handleApiKeyChange('google_search_engine_id', value);
-                }}
-              />
-              <a 
-                href="https://programmablesearchengine.google.com/about/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-blue-500 hover:underline"
-              >
-                Get ID
-              </a>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Required for Google Custom Search API
-            </p>
-          </div>
+          
           
           <div className="mt-2">
             <Button
@@ -720,47 +623,7 @@ const SettingsForm = () => {
           </div>
         </div>
         
-        <p className="flex items-center gap-2 mt-6">
-          <CreditCard size={20} /> Billing & Plan
-        </p>
-        <Separator />
-        <p className="text-muted-foreground">
-          You are currently on a{' '}
-          {subscription?.status === 'active' ? 'Pro' : 'Free'} Plan
-        </p>
-        <Link
-          href="/"
-          target="_blank"
-          className="text-muted-foreground flex flex-row items-center gap-2"
-        >
-          View Plans <ExternalLink size={16} />
-        </Link>
-        {subscription?.status === 'active' ? (
-          <div>
-            <Button
-              type="button"
-              size="sm"
-              variant={'secondary'}
-              disabled={loadingPortal}
-              className="text-sm"
-            //   onClick={redirectToCustomerPortal}
-            >
-              Manage Subscription
-            </Button>
-          </div>
-        ) : (
-          <div>
-            <Button
-              type="button"
-              size="sm"
-              variant={'secondary'}
-              className="text-sm"
-            //   onClick={() => setOpen(true)}
-            >
-              Start Plan
-            </Button>
-          </div>
-        )}
+        
       </>
       <AlertDialog open={openAlertMessage}>
         <AlertDialogContent>

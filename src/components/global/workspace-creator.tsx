@@ -22,12 +22,14 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 // import { useToast } from '../ui/use-toast';
 import { useToast } from "@/lib/hooks/use-toast"
+import { useAppState } from '@/lib/providers/state-provider';
 
 
 const WorkspaceCreator = () => {
   const { user } = useSupabaseUser();
   const { toast } = useToast();
   const router = useRouter();
+  const { dispatch } = useAppState();
   const [permissions, setPermissions] = useState('private');
   const [title, setTitle] = useState('');
   const [collaborators, setCollaborators] = useState<User[]>([]);
@@ -56,16 +58,46 @@ const WorkspaceCreator = () => {
         logo: null,
         bannerUrl: '',
       };
-      if (permissions === 'private') {
-        toast({ title: 'Success', description: 'Created the workspace' });
-        await createWorkspace(newWorkspace);
-        router.refresh();
-      }
-      if (permissions === 'shared') {
-        toast({ title: 'Success', description: 'Created the workspace' });
-        await createWorkspace(newWorkspace);
-        await addCollaborators(collaborators, uuid);
-        router.refresh();
+      
+      try {
+        if (permissions === 'private') {
+          // Create workspace in database
+          await createWorkspace(newWorkspace);
+          
+          // Add to local state with empty folders array
+          dispatch({
+            type: 'ADD_WORKSPACE',
+            payload: { ...newWorkspace, folders: [] },
+          });
+          
+          toast({ title: 'Success', description: 'Created the workspace' });
+        }
+        
+        if (permissions === 'shared') {
+          // Create workspace in database
+          await createWorkspace(newWorkspace);
+          
+          // Add collaborators in database
+          await addCollaborators(collaborators, uuid);
+          
+          // Add to local state with empty folders array
+          dispatch({
+            type: 'ADD_WORKSPACE',
+            payload: { ...newWorkspace, folders: [] },
+          });
+          
+          toast({ title: 'Success', description: 'Created the workspace' });
+        }
+        
+        // Navigate to the new workspace
+        router.push(`/dashboard/${uuid}`);
+      } catch (error) {
+        console.error('Error creating workspace:', error);
+        toast({ 
+          title: 'Error', 
+          description: 'Failed to create workspace. Please try again.',
+          variant: 'destructive'
+        });
       }
     }
     setIsLoading(false);

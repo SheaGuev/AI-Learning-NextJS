@@ -20,22 +20,29 @@ interface PDFJS {
 
 // Helper function to load PDF.js if not already loaded
 const loadPDFJS = async () => {
-  if (!(window as any).pdfjsLib) {
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
-      script.onload = () => {
-        // Set the worker URL
-        if ((window as any).pdfjsLib && 'GlobalWorkerOptions' in (window as any).pdfjsLib) {
-          ((window as any).pdfjsLib as PDFJS).GlobalWorkerOptions.workerSrc = 
-            'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-        }
-        resolve();
-      };
-      script.onerror = () => reject(new Error('Failed to load PDF.js'));
-      document.head.appendChild(script);
-    });
+  // Set the worker URL for the already loaded PDF.js from node_modules
+  if ((window as any).pdfjsLib) {
+    ((window as any).pdfjsLib as PDFJS).GlobalWorkerOptions.workerSrc = 
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    return;
   }
+  
+  // Fallback to loading from CDN if not already loaded
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script');
+    // Use stable version from CDN instead of directly from mozilla.github.io
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = () => {
+      // Set the worker URL
+      if ((window as any).pdfjsLib && 'GlobalWorkerOptions' in (window as any).pdfjsLib) {
+        ((window as any).pdfjsLib as PDFJS).GlobalWorkerOptions.workerSrc = 
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      resolve();
+    };
+    script.onerror = () => reject(new Error('Failed to load PDF.js'));
+    document.head.appendChild(script);
+  });
 };
 
 // Standalone function for extracting full text
@@ -81,8 +88,12 @@ export const extractFullTextFromFile = async (file: File): Promise<string> => {
       throw new Error('The PDF is password protected. Please remove the password and try again.');
     } else if (error.name === 'InvalidPDFException') {
       throw new Error('The PDF file is invalid or corrupted. Please try another file.');
+    } else if (error.message?.includes('not a PDF file')) {
+      throw new Error('The uploaded file is not a valid PDF. Please upload a PDF document.');
+    } else if (error.message?.includes('failed to load')) {
+      throw new Error('Failed to load PDF processing library. Please check your internet connection and try again.');
     } else {
-      throw new Error('Failed to extract text from PDF.');
+      throw new Error(`Failed to extract text from PDF: ${error.message || 'Unknown error'}`);
     }
   }
 };

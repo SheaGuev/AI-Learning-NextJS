@@ -25,18 +25,23 @@ const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
 
   useEffect(() => {
     if (!state.workspaces.length) {
+      const workspacesWithEmptyFolders = [
+        ...privateWorkspaces,
+        ...sharedWorkspaces,
+        ...collaboratingWorkspaces,
+      ].map((workspace) => ({ 
+        ...workspace, 
+        folders: [] 
+      }));
+      
       dispatch({
         type: 'SET_WORKSPACES',
         payload: {
-          workspaces: [
-            ...privateWorkspaces,
-            ...sharedWorkspaces,
-            ...collaboratingWorkspaces,
-          ].map((workspace) => ({ ...workspace, folders: [] })),
+          workspaces: workspacesWithEmptyFolders,
         },
       });
     }
-  }, [privateWorkspaces, collaboratingWorkspaces, sharedWorkspaces]);
+  }, [privateWorkspaces, collaboratingWorkspaces, sharedWorkspaces, dispatch]);
 
   const handleSelect = (option: workspace) => {
     setSelectedOption(option);

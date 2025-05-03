@@ -1193,7 +1193,7 @@ Return ONLY valid JSON with no explanations.`;
         {/* Form and data display section */}
         <div className="flex-1 overflow-y-auto p-4">
           {!learningPlan && !isLoading && !isFileUploading && (
-            <form onSubmit={handleGenerateLearningPath} className="max-w-2xl mx-auto">
+            <form onSubmit={handleGenerateLearningPath} className=""> 
               <div className="mb-4">
                 <label htmlFor="goal" className="block text-sm font-medium text-gray-300 mb-1">
                   What do you want to learn?
@@ -1343,7 +1343,7 @@ Return ONLY valid JSON with no explanations.`;
           )}
           
           {learningPlan && !isLoading && !isFileUploading && (
-            <div className="max-w-4xl mx-auto">
+            <div className=""> 
               <div className="mb-6">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold text-white mb-2">{learningPlan.title}</h2>
@@ -1442,4 +1442,4 @@ Return ONLY valid JSON with no explanations.`;
       </div>
     </div>
   );
-}; 
+};

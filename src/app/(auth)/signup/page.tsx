@@ -102,7 +102,7 @@ const Signup = () => {
           <Link href="/" className="w-full flex justify-left items-center">
             <Ll />
             <span className="font-semibold dark:text-white text-4xl first-letter:ml-2">
-              cypress.
+              Lateral Learning AI
             </span>
           </Link>
           <FormDescription className="text-foreground/60">

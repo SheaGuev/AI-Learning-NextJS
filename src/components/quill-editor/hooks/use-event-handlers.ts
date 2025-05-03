@@ -860,6 +860,7 @@ ${section.content}`;
     };
     
     // Register all event listeners
+    quill.root.addEventListener('ai-generate', handleAIGenerateEvent);
     document.addEventListener('flashcard-save-needed', handleDirectSaveRequest);
     document.addEventListener('quiz-save-needed', handleDirectSaveRequest);
     document.addEventListener('flashcard-ai-generate', handleFlashcardAIGenerateEvent);

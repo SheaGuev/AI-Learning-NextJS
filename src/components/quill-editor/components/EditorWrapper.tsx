@@ -95,23 +95,6 @@ const EditorWrapper: React.FC<QuillEditorProps> = ({
     };
   }, [quill, quillHandler]);
   
-  // Handle document changes from other users
-  useEffect(() => {
-    if (quill === null || socket === null) return;
-    
-    const socketHandler = (deltas: any, id: string) => {
-      if (id === fileId) {
-        quill.updateContents(deltas);
-      }
-    };
-    
-    socket.on('receive-changes', socketHandler);
-    
-    return () => {
-      socket.off('receive-changes', socketHandler);
-    };
-  }, [quill, socket, fileId]);
-  
   // Ensure socket room is created when component mounts
   useEffect(() => {
     if (socket && fileId) {
