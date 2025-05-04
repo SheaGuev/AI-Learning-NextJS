@@ -772,75 +772,6 @@ Return ONLY valid JSON with no explanations.`;
     try {
       setIsSavingToWorkspace(true);
       
-      // Check if folders exist in the workspace
-      if (folders.length === 0) {
-        toast({
-          title: "Error",
-          description: "No folders available in this workspace.",
-          variant: "destructive",
-        });
-        setIsSavingToWorkspace(false);
-        return;
-      }
-      
-      // Find or create a "Learning Paths" folder
-      let learningPathsFolder = folders.find(folder => folder.title === "Learning Paths");
-      
-      if (!learningPathsFolder) {
-        // Create a new "Learning Paths" folder
-        const newFolder = {
-          id: v4(),
-          title: "Learning Paths",
-          iconId: "📚",
-          data: null,
-          inTrash: null,
-          workspaceId,
-          bannerUrl: '',
-          createdAt: new Date().toISOString(),
-        };
-        
-        // Create folder in database
-        const { error: folderError } = await createFolder(newFolder);
-        
-        if (folderError) {
-          toast({
-            title: "Error",
-            description: "Could not create Learning Paths folder.",
-            variant: "destructive",
-          });
-          setIsSavingToWorkspace(false);
-          return;
-        }
-        
-        // Update local state with the new folder
-        dispatch({
-          type: 'ADD_FOLDER',
-          payload: { 
-            workspaceId, 
-            folder: { ...newFolder, files: [] } 
-          },
-        });
-        
-        // Reload folders to ensure we have the latest data
-        const { data: refreshedFolders, error: refreshError } = await getFolders(workspaceId);
-        if (!refreshError && refreshedFolders) {
-          setFolders(refreshedFolders);
-          // Find the newly created folder in the refreshed list
-          learningPathsFolder = refreshedFolders.find(folder => folder.title === "Learning Paths");
-          if (!learningPathsFolder) {
-            // If somehow we still can't find it, use the folder we just created
-            learningPathsFolder = newFolder;
-          }
-        } else {
-          // If refresh fails, use the folder we just created
-          learningPathsFolder = newFolder;
-        }
-        
-        toast({
-          title: "Success",
-          description: "Created Learning Paths folder",
-        });
-      }
       
       // Create a new folder for this specific learning path
       const sanitizedTopicName = learningPlan.title.replace(/[^a-zA-Z0-9 ]/g, '').trim();
@@ -1052,7 +983,7 @@ Return ONLY valid JSON with no explanations.`;
     const [isExpanded, setIsExpanded] = useState(false);
     
     return (
-      <div className="mb-6 bg-gray-900 bg-opacity-50 rounded-lg p-4 border border-violet-950">
+      <div className="mb-6 bg-zinc-800 bg-opacity-50 rounded-lg p-4 border border-zinc-800">
         <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
           <h3 className="text-lg font-semibold text-white">Module {index + 1}: {module.title}</h3>
           <span className="text-gray-400 text-sm">{module.estimatedTime}</span>
@@ -1108,14 +1039,14 @@ Return ONLY valid JSON with no explanations.`;
 
   const ScheduleCard: React.FC<{ schedule: StudySession[] }> = ({ schedule }) => {
     return (
-      <div className="mb-6 bg-gray-800 rounded-lg p-4 border border-gray-700">
+      <div className="mb-6 bg-zinc-800 bg-opacity-50 rounded-lg p-4 border border-zinc-800">
         <h3 className="text-lg font-semibold text-white mb-3 flex items-center">
           <RiCalendarLine className="mr-2" /> Study Schedule
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {schedule.map((session, index) => (
-            <div key={index} className="bg-gray-700 p-3 rounded-md">
+            <div key={index} className="bg-zinc-900 bg-opacity-50   p-3 rounded-md">
               <div className="font-medium text-white mb-1">{session.day}</div>
               <div className="text-gray-300 text-sm mb-2">{session.duration}</div>
               <ul className="list-disc pl-5 text-gray-300 text-sm">
@@ -1365,14 +1296,14 @@ Return ONLY valid JSON with no explanations.`;
               <div className="flex justify-center mt-6 space-x-4">
                 <button
                   onClick={() => setLearningPlan(null)}
-                  className="px-4 py-2 text-sm text-blue-400 hover:text-blue-300"
+                  className="px-4 py-2 text-sm text-violet-400 hover:text-violet-300"
                 >
                   Create or Upload New Plan
                 </button>
                 <button
                   onClick={saveToWorkspace}
                   disabled={isSavingToWorkspace}
-                  className="flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center px-3 py-1.5 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSavingToWorkspace ? (
                     <>
