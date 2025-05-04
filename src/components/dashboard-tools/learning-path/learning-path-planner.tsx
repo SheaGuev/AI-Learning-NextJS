@@ -1159,8 +1159,8 @@ Return ONLY valid JSON with no explanations.`;
     <div className="bg-[#1e1e2e] border border-[#6d28d9] rounded-lg p-5 shadow-lg">
       <div className="flex flex-col space-y-4">
         {/* Content Uploader Section */}
-        <div className="flex flex-wrap gap-4 pb-4 border-b border-[#44475a]">
-          <button 
+        {/* <div className="flex flex-wrap gap-4 pb-4 border-b border-[#44475a]"> */}
+          {/* <button 
             onClick={() => setShowTextPasteModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-[#282a36] text-white rounded-lg hover:bg-[#2d2d3a]"
           >
@@ -1175,7 +1175,7 @@ Return ONLY valid JSON with no explanations.`;
               onChange={handleFileUpload}
               className="hidden"
             />
-          </label>
+          </label> */}
           
           {pdfProcessingState === 'extracting' && (
             <div className="flex items-center gap-2 text-yellow-400">
@@ -1440,6 +1440,6 @@ Return ONLY valid JSON with no explanations.`;
           </div>
         )}
       </div>
-    </div>
+    // </div>
   );
 };

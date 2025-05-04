@@ -18,44 +18,42 @@ interface PDFJS {
   };
 }
 
-// Helper function to load PDF.js if not already loaded
+// Helper function to load PDF.js 
 const loadPDFJS = async () => {
-  // Check if PDF.js is already loaded
-  if ((window as any).pdfjsLib) {
-    const pdfjsLib = (window as any).pdfjsLib as PDFJS;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 
-      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-    return;
+  try {
+    // If we already have pdfjsLib available on window, use it
+    if ((window as any).pdfjsLib) {
+      return;
+    }
+
+    // Dynamically import the pdfjs library
+    const pdfjs = await import('pdfjs-dist');
+    
+    // Set the pdfjsLib on window for future use
+    (window as any).pdfjsLib = pdfjs;
+    
+    // Set the worker source to our local copy
+    pdfjs.GlobalWorkerOptions.workerSrc = '/pdf-lib/pdf.worker.js';
+    
+    return pdfjs;
+  } catch (error) {
+    console.error("Error loading PDF.js:", error);
+    throw new Error("Failed to load PDF.js");
   }
-  
-  // Fallback to loading from jsDelivr CDN if not already loaded
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
-    script.onload = () => {
-      // Set the worker URL
-      if ((window as any).pdfjsLib && 'GlobalWorkerOptions' in (window as any).pdfjsLib) {
-        ((window as any).pdfjsLib as PDFJS).GlobalWorkerOptions.workerSrc = 
-          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-      }
-      resolve();
-    };
-    script.onerror = () => reject(new Error('Failed to load PDF.js'));
-    document.head.appendChild(script);
-  });
 };
 
 // Standalone function for extracting full text
 export const extractFullTextFromFile = async (file: File): Promise<string> => {
   try {
-    await loadPDFJS();
+    const pdfjs = await loadPDFJS();
+    const pdfjsLib = (window as any).pdfjsLib;
 
-    if (!(window as any).pdfjsLib) {
+    if (!pdfjsLib) {
       throw new Error('PDF.js library failed to load properly');
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = ((window as any).pdfjsLib as PDFJS).getDocument({ data: new Uint8Array(arrayBuffer) });
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
     const pdf = await loadingTask.promise;
     
     let extractedText = '';
