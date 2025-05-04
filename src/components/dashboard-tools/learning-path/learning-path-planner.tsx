@@ -1,13 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RiCalendarLine, RiRoadMapLine, RiSendPlane2Line, RiAddLine, RiFileAddLine, RiUploadCloud2Line } from 'react-icons/ri';
+import { RiCalendarLine, RiRoadMapLine, RiSendPlane2Line, RiAddLine, RiFileAddLine, RiUploadCloud2Line, RiEdit2Line } from 'react-icons/ri';
 import { useGemini } from '@/lib/hooks/useGemini';
 import { useAppState } from '@/lib/providers/state-provider';
 import { createFile, getFolders, createFolder } from '@/supabase/queries';
 import { v4 } from 'uuid';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { extractContentFromFileData, parseUploadedPlan } from './learning-path-helpers';
+import { getDocument, GlobalWorkerOptions, PDFDocumentProxy, version } from 'pdfjs-dist';
+import { usePDFExtractor } from '@/lib/hooks/use-pdf-extractor';
+
+// Configure PDF.js worker - use a relative path for reliability
+// This loads the worker from the public directory
+GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 interface LearningModule {
   title: string;
@@ -36,11 +42,14 @@ interface LearningPlan {
   schedule?: StudySession[];
 }
 
-const LearningPathPlanner: React.FC = () => {
+export const LearningPathPlanner: React.FC = () => {
   const { state, workspaceId, dispatch } = useAppState();
   const { toast } = useToast();
   const [goal, setGoal] = useState('');
   const [timeframe, setTimeframe] = useState('2 weeks');
+  const [customTimeframe, setCustomTimeframe] = useState('');
+  const [showCustomTimeframe, setShowCustomTimeframe] = useState(false);
+  const [sliderPosition, setSliderPosition] = useState(30); // Default slider position (0-100)
   const [includeSchedule, setIncludeSchedule] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [learningPlan, setLearningPlan] = useState<LearningPlan | null>(null);
@@ -55,6 +64,85 @@ const LearningPathPlanner: React.FC = () => {
   const [pdfProcessingState, setPdfProcessingState] = useState<'idle' | 'extracting' | 'generating'>('idle');
   const [showTextPasteModal, setShowTextPasteModal] = useState(false);
   const [pastedText, setPastedText] = useState('');
+  const { extractFullText } = usePDFExtractor();
+
+  // Define preset timeframes for the slider with their positions and labels
+  const sliderPresets = [
+    { position: 0, days: 1, label: '1 day' },
+    { position: 20, days: 7, label: '1 week' },
+    { position: 40, days: 30, label: '1 month' },
+    { position: 60, days: 90, label: '3 months' },
+    { position: 80, days: 180, label: '6 months' },
+    { position: 100, days: 365, label: '1 year' }
+  ];
+
+  // Convert slider position (0-100) to days
+  const getDaysFromSliderPosition = (position: number): number => {
+    // Find the two closest presets
+    for (let i = 0; i < sliderPresets.length - 1; i++) {
+      const lower = sliderPresets[i];
+      const upper = sliderPresets[i + 1];
+      
+      if (position >= lower.position && position <= upper.position) {
+        // Calculate days based on linear interpolation between preset points
+        const positionRatio = (position - lower.position) / (upper.position - lower.position);
+        return Math.round(lower.days + positionRatio * (upper.days - lower.days));
+      }
+    }
+    
+    // Default for any edge cases
+    return sliderPresets[sliderPresets.length - 1].days;
+  };
+
+  // Convert days to human-readable timeframe
+  const getTimeframeFromDays = (days: number): string => {
+    if (days === 1) {
+      return '1 day';
+    } else if (days < 7) {
+      return `${days} days`;
+    } else if (days === 7) {
+      return '1 week';
+    } else if (days < 30) {
+      const weeks = Math.round(days / 7);
+      return `${weeks} week${weeks === 1 ? '' : 's'}`;
+    } else if (days === 30) {
+      return '1 month';
+    } else if (days < 365) {
+      const months = Math.round(days / 30);
+      return `${months} month${months === 1 ? '' : 's'}`;
+    } else {
+      return '1 year';
+    }
+  };
+
+  // Handle slider change
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const position = parseInt(e.target.value);
+    setSliderPosition(position);
+    const days = getDaysFromSliderPosition(position);
+    setTimeframe(getTimeframeFromDays(days));
+    setShowCustomTimeframe(false);
+  };
+
+  // Handle toggle for custom timeframe
+  const toggleCustomTimeframe = () => {
+    setShowCustomTimeframe(!showCustomTimeframe);
+    if (showCustomTimeframe) {
+      // If turning off custom, reset to slider value
+      const days = getDaysFromSliderPosition(sliderPosition);
+      setTimeframe(getTimeframeFromDays(days));
+    }
+  };
+
+  const handleCustomTimeframeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomTimeframe(e.target.value);
+    setTimeframe(e.target.value);
+  };
+
+  // Get the current days value from the slider position
+  const getCurrentDays = (): number => {
+    return getDaysFromSliderPosition(sliderPosition);
+  };
 
   useEffect(() => {
     // Try to load API key from localStorage on mount
@@ -128,48 +216,82 @@ const LearningPathPlanner: React.FC = () => {
     
     if (!goal.trim()) return;
     
+    // Validate custom timeframe
+    if (showCustomTimeframe && !customTimeframe.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a custom timeframe',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setIsLoading(true);
     setLearningPlan(null);
     setRawResponse(null);
     setShowRawResponse(false);
 
     try {
-      // Create the improved prompt for the AI
-      const prompt = `Create a detailed learning path for: "${goal}". 
-      The learning path should be structured for a timeframe of ${timeframe}. 
-      ${includeSchedule ? 'Please include a suggested study schedule.' : ''}
+      // Get current timeframe and determine appropriate schedule units
+      const currentTimeframe = showCustomTimeframe ? customTimeframe : timeframe;
+      let schedulePeriodType = "days";
       
-      IMPORTANT: Your response MUST be valid JSON that strictly follows this structure:
-      {
-        "title": "Learning path title",
-        "description": "Brief description of the learning goal and approach",
-        "modules": [
-          {
-            "title": "Module title",
-            "description": "Brief description of this module",
-            "estimatedTime": "Estimated time to complete this module",
-            "topics": [
-              {
-                "title": "Topic title",
-                "subtopics": ["Subtopic 1", "Subtopic 2"],
-                "resources": ["Resource 1", "Resource 2"],
-                "activities": ["Activity 1", "Activity 2"]
-              }
-            ]
-          }
-        ]${includeSchedule ? ',\n        "schedule": [\n          {\n            "day": "Day 1",\n            "topics": ["Topic 1", "Topic 2"],\n            "duration": "2 hours"\n          }\n        ]' : ''}
+      // Get the numeric value from timeframe
+      const timeNumber = extractNumber(currentTimeframe);
+      
+      // Determine appropriate time units based on overall timeframe
+      if (currentTimeframe.includes('month') || 
+          (currentTimeframe.includes('week') && timeNumber > 6) ||
+          (timeNumber > 45 && !currentTimeframe.includes('hour'))) {
+        schedulePeriodType = "weeks";
+      } else if (currentTimeframe.includes('day') || 
+                (currentTimeframe.includes('week') && timeNumber <= 6)) {
+        schedulePeriodType = "days";
+      } else if ((currentTimeframe.includes('month') && timeNumber > 3) || 
+                currentTimeframe.includes('year')) {
+        schedulePeriodType = "months";
       }
-      
-      FORMATTING REQUIREMENTS:
-      1. ALL property names must be in double quotes: "property": value
-      2. ALL string values must be in double quotes: "property": "value"
-      3. Arrays must use square brackets: "array": ["item1", "item2"]
-      4. No trailing commas in arrays or objects: ["item1", "item2"] NOT ["item1", "item2",]
-      5. Proper nesting of braces and brackets
-      6. No comments or additional text before or after the JSON
-      7. No markdown formatting or code blocks around the JSON
-      
-      Return ONLY the JSON object with NO additional text before or after it.`;
+
+      // Create a simplified prompt for the AI
+      const prompt = `Create a comprehensive learning path for "${goal}" over ${currentTimeframe}.
+${includeSchedule ? `Include a study schedule using ${schedulePeriodType} (${schedulePeriodType === 'days' ? 'Day 1, Day 2' : schedulePeriodType === 'weeks' ? 'Week 1, Week 2' : 'Month 1, Month 2'})` : ''}
+
+Return ONLY this JSON structure with no additional text:
+{
+  "title": "Short, Concise Learning Path Title (5-7 words)",
+  "description": "Clear description",
+  "modules": [
+    {
+      "title": "Concise Module Title (3-5 words)",
+      "description": "Module description",
+      "estimatedTime": "Time estimate",
+      "topics": [
+        {
+          "title": "Brief Topic Title (2-4 words)",
+          "subtopics": ["Subtopic 1", "Subtopic 2"],
+          "resources": ["Resource 1", "Resource 2"],
+          "activities": ["Activity 1", "Activity 2"]
+        }
+      ]
+    }
+  ]${includeSchedule ? `,
+  "schedule": [
+    {
+      "day": "${schedulePeriodType === 'days' ? 'Day' : schedulePeriodType === 'weeks' ? 'Week' : 'Month'} 1",
+      "topics": ["Topic from module 1"],
+      "duration": "2 hours"
+    }
+  ]` : ''}
+}
+
+7 Rules:
+1. Create ${timeNumber <= 7 ? '4-5' : timeNumber <= 30 ? '5-8' : '6-10'} modules with progressive complexity
+2. Keep ALL titles short and concise - avoid long phrases and sentences
+3. Balance content evenly across modules rather than front-loading information
+4. Use double quotes for ALL names and values
+5. NO trailing commas
+6. Valid JSON only
+7. NO text before or after the JSON`;
 
       const response = await generateResponse(prompt);
       
@@ -261,6 +383,147 @@ const LearningPathPlanner: React.FC = () => {
     }
   };
 
+  // Helper function to safely extract number from a string
+  const extractNumber = (text: string): number => {
+    const match = text.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+  };
+
+  // *** Function to generate plan from extracted text (e.g., from file or PDF) ***
+  const generatePlanFromText = async (extractedText: string) => {
+    setPdfProcessingState('generating');
+    setIsLoading(true);
+    setLearningPlan(null);
+    setRawResponse(null);
+    setShowRawResponse(false);
+
+    try {
+      // Get current timeframe and determine appropriate schedule units
+      const currentTimeframe = showCustomTimeframe ? customTimeframe : timeframe;
+      let schedulePeriodType = "days";
+      
+      // Get the numeric value from timeframe
+      const timeNumber = extractNumber(currentTimeframe);
+      
+      // Determine appropriate time units based on overall timeframe
+      if (currentTimeframe.includes('month') || 
+          (currentTimeframe.includes('week') && timeNumber > 6) ||
+          (timeNumber > 45 && !currentTimeframe.includes('hour'))) {
+        schedulePeriodType = "weeks";
+      } else if (currentTimeframe.includes('day') || 
+                (currentTimeframe.includes('week') && timeNumber <= 6)) {
+        schedulePeriodType = "days";
+      } else if ((currentTimeframe.includes('month') && timeNumber > 3) || 
+                currentTimeframe.includes('year')) {
+        schedulePeriodType = "months";
+      }
+
+      // Simpler, more direct prompt
+      const prompt = `Create a learning path in JSON format for this content:
+
+\`\`\`
+${extractedText}
+\`\`\`
+
+Return ONLY this JSON structure with no additional text:
+{
+  "title": "Short, Concise Title (5-7 words)",
+  "description": "Clear description",
+  "modules": [
+    {
+      "title": "Brief Module Title (3-5 words)",
+      "description": "Module description",
+      "estimatedTime": "Time estimate",
+      "topics": [
+        {
+          "title": "Short Topic Title (2-4 words)",
+          "subtopics": ["Subtopic 1", "Subtopic 2"],
+          "resources": ["Resource 1", "Resource 2"],
+          "activities": ["Activity 1", "Activity 2"]
+        }
+      ]
+    }
+  ]${includeSchedule ? `,
+  "schedule": [
+    {
+      "day": "${schedulePeriodType === 'days' ? 'Day' : schedulePeriodType === 'weeks' ? 'Week' : 'Month'} 1",
+      "topics": ["Topic from module 1"],
+      "duration": "2 hours"
+    }
+  ]` : ''}
+}
+
+Instructions:
+1. Create ${timeNumber <= 7 ? '4-5' : timeNumber <= 30 ? '5-8' : '6-10'} modules with progressive complexity
+2. Keep all titles concise (modules: 3-5 words, topics: 2-4 words)
+3. For the schedule, use ${schedulePeriodType} (${schedulePeriodType === 'days' ? 'Day 1, Day 2' : schedulePeriodType === 'weeks' ? 'Week 1, Week 2' : 'Month 1, Month 2'})
+4. Create a plan for ${currentTimeframe}
+5. All modules need topics with subtopics
+6. Return ONLY valid JSON, no text before or after`;
+
+      const response = await generateResponse(prompt);
+      setRawResponse(response);
+
+      try {
+        // Extract JSON from response, removing any markdown formatting or extra text
+        const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || response.match(/```\n([\s\S]*?)\n```/) || [null, response];
+        let jsonString = jsonMatch[1] || response;
+        
+        // Remove any non-JSON content before the first { or after the last }
+        jsonString = jsonString.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+        
+        try {
+          // First attempt to parse directly
+          const parsedPlan = JSON.parse(jsonString);
+          setLearningPlan(parsedPlan);
+        } catch (parseError) {
+          console.error('Initial JSON parsing error:', parseError);
+          
+          // Try automatic JSON repair strategies
+          try {
+            // Fix common JSON issues
+            const fixedJson = attemptAdvancedJsonRepair(jsonString);
+            try {
+              const parsedPlan = JSON.parse(fixedJson);
+              console.log('Successfully parsed JSON after repairs');
+              setLearningPlan(parsedPlan);
+            } catch (secondError) {
+              console.error('Failed to parse JSON after repairs:', secondError);
+              await repairJsonWithAI(jsonString);
+            }
+          } catch (repairError) {
+            console.error('Error during JSON repair:', repairError);
+            await repairJsonWithAI(jsonString);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing AI response:', error);
+        setShowRawResponse(true);
+        toast({
+          title: 'JSON Error',
+          description: 'Error processing the AI response. Attempting repair...',
+          variant: 'destructive',
+        });
+        await repairJsonWithAI(response);
+      }
+    } catch (error: any) {
+      console.error('Error generating learning path from text:', error);
+      if (error.message?.includes('API key')) {
+        setShowApiKeyInput(true);
+      } else {
+        toast({
+          title: 'Error',
+          description: `Failed to generate plan: ${error.message || 'Unknown error'}`,
+          variant: 'destructive',
+        });
+      }
+      setShowRawResponse(true);
+    } finally {
+      setIsLoading(false);
+      setPdfProcessingState('idle');
+    }
+  };
+
   // New function: Use the AI model to repair broken JSON
   const repairJsonWithAI = async (brokenJson: string) => {
     try {
@@ -270,33 +533,60 @@ const LearningPathPlanner: React.FC = () => {
         description: 'Using AI to fix the JSON format...',
       });
       
-      // Create a repair prompt
-      const repairPrompt = `I received this JSON response that is not properly formatted. 
-      Please fix it to be valid JSON that strictly follows this structure:
-      {
-        "title": "Learning path title",
-        "description": "Brief description of the learning goal and approach",
-        "modules": [
-          {
-            "title": "Module title",
-            "description": "Brief description of this module",
-            "estimatedTime": "Estimated time to complete this module",
-            "topics": [
-              {
-                "title": "Topic title",
-                "subtopics": ["Subtopic 1", "Subtopic 2"],
-                "resources": ["Resource 1", "Resource 2"],
-                "activities": ["Activity 1", "Activity 2"]
-              }
-            ]
-          }
-        ]${includeSchedule ? ',\n        "schedule": [\n          {\n            "day": "Day 1",\n            "topics": ["Topic 1", "Topic 2"],\n            "duration": "2 hours"\n          }\n        ]' : ''}
+      // Get current timeframe and determine appropriate schedule units
+      const currentTimeframe = showCustomTimeframe ? customTimeframe : timeframe;
+      let schedulePeriodType = "days";
+      
+      // Get the numeric value from timeframe
+      const timeNumber = extractNumber(currentTimeframe);
+      
+      // Determine appropriate time units based on overall timeframe
+      if (currentTimeframe.includes('month') || 
+          (currentTimeframe.includes('week') && timeNumber > 6) ||
+          (timeNumber > 45 && !currentTimeframe.includes('hour'))) {
+        schedulePeriodType = "weeks";
+      } else if (currentTimeframe.includes('day') || 
+                (currentTimeframe.includes('week') && timeNumber <= 6)) {
+        schedulePeriodType = "days";
+      } else if ((currentTimeframe.includes('month') && timeNumber > 3) || 
+                currentTimeframe.includes('year')) {
+        schedulePeriodType = "months";
       }
       
-      Here is the broken JSON:
-      ${brokenJson}
-      
-      IMPORTANT: Return ONLY the fixed JSON without ANY explanations, comments, or markdown formatting.`;
+      // Simpler repair prompt
+      const repairPrompt = `Fix this JSON to match this structure exactly:
+{
+  "title": "Short, Concise Title",
+  "description": "Description",
+  "modules": [
+    {
+      "title": "Brief Module Title",
+      "description": "Description",
+      "estimatedTime": "Time",
+      "topics": [
+        {
+          "title": "Short Topic",
+          "subtopics": ["Subtopic"],
+          "resources": ["Resource"],
+          "activities": ["Activity"]
+        }
+      ]
+    }
+  ]${includeSchedule ? `,
+  "schedule": [
+    {
+      "day": "${schedulePeriodType === 'days' ? 'Day' : schedulePeriodType === 'weeks' ? 'Week' : 'Month'} 1",
+      "topics": ["Topic"],
+      "duration": "Duration"
+    }
+  ]` : ''}
+}
+
+Broken JSON:
+${brokenJson}
+
+Create ${timeNumber <= 7 ? '4-5' : timeNumber <= 30 ? '5-8' : '6-10'} modules with concise titles.
+Return ONLY valid JSON with no explanations.`;
       
       // Send repair request to AI
       const repairResponse = await generateResponse(repairPrompt);
@@ -335,127 +625,6 @@ const LearningPathPlanner: React.FC = () => {
     }
   };
 
-  // *** NEW: Function to generate plan from extracted text (e.g., from PDF) ***
-  const generatePlanFromText = async (extractedText: string) => {
-    setPdfProcessingState('generating');
-    setIsLoading(true);
-    setLearningPlan(null);
-    setRawResponse(null);
-    setShowRawResponse(false);
-
-    try {
-      // Create the prompt for the AI, instructing it to parse the text
-      const prompt = `Analyze the following text extracted from a document (likely a learning plan or syllabus) and create a structured learning path in JSON format.
-
-      Extracted Text:
-      \`\`\`
-      ${extractedText}
-      \`\`\`
-
-      IMPORTANT: Structure the output as a valid JSON object following this schema strictly:
-      {
-        "title": "Appropriate title based on content",
-        "description": "Brief description summarizing the plan",
-        "modules": [
-          {
-            "title": "Module/Week/Section title",
-            "description": "Brief description of this module",
-            "estimatedTime": "Estimated time (if found, otherwise 'N/A')",
-            "topics": [
-              {
-                "title": "Topic title",
-                "subtopics": ["Subtopic 1", "Subtopic 2"],
-                "resources": ["Resource 1", "Resource 2"],
-                "activities": ["Activity 1", "Activity 2"]
-              }
-            ]
-          }
-        ]${includeSchedule ? ',\n        "schedule": [\n          {\n            "day": "Day/Date",\n            "topics": ["Topic 1", "Topic 2"],\n            "duration": "Duration (if found, otherwise \'N/A\')"\n          }\n        ]' : ''}
-      }
-
-      FORMATTING REQUIREMENTS:
-      1. ALL property names must be in double quotes: "property": value
-      2. ALL string values must be in double quotes: "property": "value"
-      3. Arrays must use square brackets: "array": ["item1", "item2"]
-      4. No trailing commas in arrays or objects: ["item1", "item2"] NOT ["item1", "item2",]
-      5. Proper nesting of braces and brackets
-      6. No comments or additional text before or after the JSON
-      7. No markdown formatting or code blocks around the JSON
-
-      Return ONLY the JSON object. Infer structure and details from the provided text as accurately as possible. If schedule details are requested (${includeSchedule}) and present, include them.`;
-
-      const response = await generateResponse(prompt);
-      setRawResponse(response);
-
-      try {
-        const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || response.match(/```\n([\s\S]*?)\n```/) || [null, response];
-        const jsonString = jsonMatch[1] || response;
-        let cleanedJson = jsonString.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-        cleanedJson = cleanedJson.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
-
-        try {
-          const parsedPlan = JSON.parse(cleanedJson);
-          setLearningPlan(parsedPlan);
-        } catch (parseError) {
-          console.error('Initial JSON parsing error (from PDF text):', parseError);
-          try {
-            const fixedJson = cleanedJson
-              .replace(/,\s*}/g, '}')
-              .replace(/,\s*\]/g, ']')
-              .replace(/\}\s*\{/g, '},{')
-              .replace(/\]\s*\[/g, '],[')
-              .replace(/}\s*]/g, '}]')
-              .replace(/"\s*"/g, '","');
-            try {
-              const parsedPlan = JSON.parse(fixedJson);
-              console.log('Successfully parsed JSON (from PDF text) after fixing format issues');
-              setLearningPlan(parsedPlan);
-            } catch (secondError) {
-              console.error('Second JSON parsing attempt (from PDF text) failed:', secondError);
-              const aggressivelyFixedJson = attemptAdvancedJsonRepair(fixedJson);
-              try {
-                const parsedPlan = JSON.parse(aggressivelyFixedJson);
-                console.log('Successfully parsed JSON (from PDF text) after aggressive repairs');
-                setLearningPlan(parsedPlan);
-              } catch (thirdError) {
-                 console.error('Failed to fix/parse JSON (from PDF text) after aggressive repairs:', thirdError);
-                 await repairJsonWithAI(fixedJson);
-              }
-            }
-          } catch (secondError) {
-             console.error('Failed to fix/parse JSON (from PDF text):', secondError);
-             await repairJsonWithAI(cleanedJson);
-          }
-        }
-      } catch (error) {
-        console.error('Error processing AI response (from PDF text):', error);
-        setShowRawResponse(true);
-        toast({
-          title: 'JSON Error',
-          description: 'Error processing the AI response generated from the PDF. Attempting repair...',
-          variant: 'destructive',
-        });
-        await repairJsonWithAI(response);
-      }
-    } catch (error: any) {
-      console.error('Error generating learning path from PDF text:', error);
-      if (error.message.includes('API key')) {
-        setShowApiKeyInput(true);
-      } else {
-        toast({
-          title: 'Error',
-          description: `Failed to generate plan from PDF: ${error.message || 'Unknown error'}`,
-          variant: 'destructive',
-        });
-      }
-      setShowRawResponse(true);
-    } finally {
-      setIsLoading(false);
-      setPdfProcessingState('idle');
-    }
-  };
-  // *** END NEW FUNCTION ***
-
   // *** MODIFIED: Function to handle file upload ***
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -471,82 +640,109 @@ const LearningPathPlanner: React.FC = () => {
 
     // --- Handle Text/Markdown Files ---
     if (fileType === 'text/plain' || fileType === 'text/markdown' || fileName.endsWith('.md') || fileName.endsWith('.txt')) {
-       setPdfProcessingState('idle');
-       const reader = new FileReader();
-       reader.onload = async (e) => {
-         const content = e.target?.result as string;
-         if (!content) {
-           toast({
-             title: 'Error Reading File',
-             description: 'Could not read the file content.',
-             variant: 'destructive',
-           });
-           setIsFileUploading(false);
-           return;
-         }
-         try {
-           const parsedPlan = parseUploadedPlan(content);
-           if (parsedPlan) {
-             setLearningPlan(parsedPlan);
-             toast({ title: 'Plan Loaded', description: 'Parsed uploaded plan.' });
-           } else {
-              toast({ title: 'Parsing Error', description: 'Could not parse uploaded file.', variant: 'destructive' });
-           }
-         } catch (error: any) {
-           console.error('Error parsing uploaded file:', error);
-           toast({
-             title: 'Parsing Error',
-             description: `An error occurred: ${error.message || 'Unknown error'}`,
-             variant: 'destructive',
-           });
-         } finally {
-           setIsFileUploading(false);
-           event.target.value = '';
-         }
-       };
-       reader.onerror = (e) => {
-         console.error('File reading error:', e);
-         toast({
-           title: 'Error Reading File',
-           description: 'Could not read the selected file.',
-           variant: 'destructive',
-         });
-         setIsFileUploading(false);
-         event.target.value = '';
-       };
-       reader.readAsText(file);
+      setPdfProcessingState('idle');
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const content = e.target?.result as string;
+        if (!content) {
+          toast({
+            title: 'Error Reading File',
+            description: 'Could not read the file content.',
+            variant: 'destructive',
+          });
+          setIsFileUploading(false);
+          return;
+        }
+        try {
+          // Send content directly to AI instead of parsing it
+          await generatePlanFromText(content);
+        } catch (error: any) {
+          console.error('Error processing uploaded file:', error);
+          toast({
+            title: 'Processing Error',
+            description: `An error occurred: ${error.message || 'Unknown error'}`,
+            variant: 'destructive',
+          });
+        } finally {
+          setIsFileUploading(false);
+          event.target.value = '';
+        }
+      };
+      reader.onerror = (e) => {
+        console.error('File reading error:', e);
+        toast({
+          title: 'Error Reading File',
+          description: 'Could not read the selected file.',
+          variant: 'destructive',
+        });
+        setIsFileUploading(false);
+        event.target.value = '';
+      };
+      reader.readAsText(file);
     }
     // --- Handle PDF Files ---
     else if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-      setIsFileUploading(false); // No need to keep the loading indicator
-      setPdfProcessingState('idle');
+      setPdfProcessingState('extracting');
       
-      // Show the text paste modal immediately
-      setShowTextPasteModal(true);
-      
-      // Provide guidance to the user
-      toast({ 
-        title: 'PDF Upload', 
-        description: 'Please copy and paste the content from your PDF using the form provided.', 
-        variant: 'default' 
-      });
-      
-      // Reset the file input
-      event.target.value = '';
+      try {
+        // Extract text from PDF using the new hook
+        const text = await extractFullText(file);
+        
+        if (text.trim().length === 0) {
+          toast({
+            title: 'PDF Error',
+            description: 'Could not extract text from the PDF. It may be scanned or have content restrictions.',
+            variant: 'destructive',
+          });
+          setPdfProcessingState('idle');
+          setIsFileUploading(false);
+          event.target.value = '';
+          
+          // Offer text paste as fallback
+          setTimeout(() => {
+            setShowTextPasteModal(true);
+            toast({
+              title: 'Try Manual Input',
+              description: 'Please copy and paste the content from your PDF directly.',
+              variant: 'default',
+            });
+          }, 1000);
+          
+          return;
+        }
+        
+        // Process extracted text
+        await generatePlanFromText(text);
+      } catch (error: any) {
+        console.error('Error processing PDF:', error);
+        toast({
+          title: 'PDF Processing Error',
+          description: error.message || 'Failed to process PDF. Please try the manual input option.',
+          variant: 'destructive',
+        });
+        
+        // Fall back to manual text pasting option if automatic extraction fails
+        setTimeout(() => {
+          setShowTextPasteModal(true);
+        }, 1000);
+      } finally {
+        setPdfProcessingState('idle');
+        setIsFileUploading(false);
+        event.target.value = '';
+      }
     }
     // --- Handle Unsupported Files ---
     else {
-       toast({
-         title: 'Unsupported File Type',
-         description: 'Please upload a .txt, .md, or .pdf file.',
-         variant: 'default',
-       });
-       setIsFileUploading(false);
-       setPdfProcessingState('idle');
-       event.target.value = '';
+      toast({
+        title: 'Unsupported File Type',
+        description: 'Please upload a .txt, .md, or .pdf file.',
+        variant: 'default',
+      });
+      setIsFileUploading(false);
+      setPdfProcessingState('idle');
+      event.target.value = '';
     }
   };
-  // *** END MODIFIED FUNCTION ***
 
   // Function to handle direct text pasting as an alternative to PDF upload
   const handlePastedTextSubmit = async (e: React.FormEvent) => {
@@ -563,7 +759,7 @@ const LearningPathPlanner: React.FC = () => {
     // Close the modal
     setShowTextPasteModal(false);
     
-    // Process the pasted text similar to PDF extraction
+    // Process the pasted text directly with AI
     await generatePlanFromText(pastedText);
     
     // Reset the state
@@ -576,75 +772,6 @@ const LearningPathPlanner: React.FC = () => {
     try {
       setIsSavingToWorkspace(true);
       
-      // Check if folders exist in the workspace
-      if (folders.length === 0) {
-        toast({
-          title: "Error",
-          description: "No folders available in this workspace.",
-          variant: "destructive",
-        });
-        setIsSavingToWorkspace(false);
-        return;
-      }
-      
-      // Find or create a "Learning Paths" folder
-      let learningPathsFolder = folders.find(folder => folder.title === "Learning Paths");
-      
-      if (!learningPathsFolder) {
-        // Create a new "Learning Paths" folder
-        const newFolder = {
-          id: v4(),
-          title: "Learning Paths",
-          iconId: "📚",
-          data: null,
-          inTrash: null,
-          workspaceId,
-          bannerUrl: '',
-          createdAt: new Date().toISOString(),
-        };
-        
-        // Create folder in database
-        const { error: folderError } = await createFolder(newFolder);
-        
-        if (folderError) {
-          toast({
-            title: "Error",
-            description: "Could not create Learning Paths folder.",
-            variant: "destructive",
-          });
-          setIsSavingToWorkspace(false);
-          return;
-        }
-        
-        // Update local state with the new folder
-        dispatch({
-          type: 'ADD_FOLDER',
-          payload: { 
-            workspaceId, 
-            folder: { ...newFolder, files: [] } 
-          },
-        });
-        
-        // Reload folders to ensure we have the latest data
-        const { data: refreshedFolders, error: refreshError } = await getFolders(workspaceId);
-        if (!refreshError && refreshedFolders) {
-          setFolders(refreshedFolders);
-          // Find the newly created folder in the refreshed list
-          learningPathsFolder = refreshedFolders.find(folder => folder.title === "Learning Paths");
-          if (!learningPathsFolder) {
-            // If somehow we still can't find it, use the folder we just created
-            learningPathsFolder = newFolder;
-          }
-        } else {
-          // If refresh fails, use the folder we just created
-          learningPathsFolder = newFolder;
-        }
-        
-        toast({
-          title: "Success",
-          description: "Created Learning Paths folder",
-        });
-      }
       
       // Create a new folder for this specific learning path
       const sanitizedTopicName = learningPlan.title.replace(/[^a-zA-Z0-9 ]/g, '').trim();
@@ -856,7 +983,7 @@ const LearningPathPlanner: React.FC = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     
     return (
-      <div className="mb-6 bg-gray-800 rounded-lg p-4 border border-gray-700">
+      <div className="mb-6 bg-zinc-800 bg-opacity-50 rounded-lg p-4 border border-zinc-800">
         <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
           <h3 className="text-lg font-semibold text-white">Module {index + 1}: {module.title}</h3>
           <span className="text-gray-400 text-sm">{module.estimatedTime}</span>
@@ -912,14 +1039,14 @@ const LearningPathPlanner: React.FC = () => {
 
   const ScheduleCard: React.FC<{ schedule: StudySession[] }> = ({ schedule }) => {
     return (
-      <div className="mb-6 bg-gray-800 rounded-lg p-4 border border-gray-700">
+      <div className="mb-6 bg-zinc-800 bg-opacity-50 rounded-lg p-4 border border-zinc-800">
         <h3 className="text-lg font-semibold text-white mb-3 flex items-center">
           <RiCalendarLine className="mr-2" /> Study Schedule
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {schedule.map((session, index) => (
-            <div key={index} className="bg-gray-700 p-3 rounded-md">
+            <div key={index} className="bg-zinc-900 bg-opacity-50   p-3 rounded-md">
               <div className="font-medium text-white mb-1">{session.day}</div>
               <div className="text-gray-300 text-sm mb-2">{session.duration}</div>
               <ul className="list-disc pl-5 text-gray-300 text-sm">
@@ -960,332 +1087,290 @@ const LearningPathPlanner: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-[600px] bg-gray-900 rounded-lg overflow-hidden">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-white flex items-center">
-          <RiRoadMapLine className="mr-2 text-blue-500" /> Learning Path Planner
-        </h2>
-        <div className="flex items-center space-x-3">
-          {learningPlan && !isLoading && (
-            <button
-              onClick={saveToWorkspace}
-              disabled={isSavingToWorkspace}
-              className="flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSavingToWorkspace ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <RiFileAddLine className="mr-1.5" />
-                  Add to Workspace
-                </>
-              )}
-            </button>
-          )}
-          <button
-            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-            className="text-xs text-blue-400 hover:text-blue-300"
+    <div className="bg-[#1e1e2e] border border-[#6d28d9] rounded-lg p-5 shadow-lg">
+      <div className="flex flex-col space-y-4">
+        {/* Content Uploader Section */}
+        {/* <div className="flex flex-wrap gap-4 pb-4 border-b border-[#44475a]"> */}
+          {/* <button 
+            onClick={() => setShowTextPasteModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#282a36] text-white rounded-lg hover:bg-[#2d2d3a]"
           >
-            {showApiKeyInput ? 'Hide API Key' : 'Set API Key'}
+            <RiFileAddLine className="text-[#7c3aed]" /> Paste Content
           </button>
-        </div>
-      </div>
-      
-      {showApiKeyInput && (
-        <div className="p-3 border-b border-gray-700 bg-gray-800">
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder="Enter your Gemini API key"
-              className="flex-1 p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white placeholder-gray-400"
-            />
-            <button
-              onClick={handleSaveApiKey}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-            >
-              Save
-            </button>
-          </div>
-          <div className="mt-1 text-xs text-gray-400">
-            Get your API key at: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">aistudio.google.com/app/apikey</a>
-          </div>
-        </div>
-      )}
-      
-      {(isLoading || isFileUploading) && (
-        <div className="p-6 flex flex-col items-center justify-center">
-          <div className="animate-spin w-8 h-8 rounded-full border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p className="text-gray-300 text-sm">
-            {pdfProcessingState === 'extracting' ? "Extracting text from PDF..." :
-             pdfProcessingState === 'generating' ? "AI is generating plan from PDF text..." :
-             isFileUploading ? "Processing uploaded file..." :
-             isLoading && rawResponse ? "AI is repairing JSON format..." :
-             isLoading ? "Generating learning path..." : "Loading..."
-            }
-          </p>
-        </div>
-      )}
-      
-      {showRawResponse && rawResponse && (
-        <div className="p-3 border-b border-gray-700 bg-gray-800">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-semibold text-white">Raw AI Response (for debugging)</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={manuallyRepairJson}
-                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                disabled={isLoading}
-              >
-                {isLoading ? "Repairing..." : "Attempt Repair"}
-              </button>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(rawResponse);
-                  toast({
-                    title: 'Copied',
-                    description: 'Raw response copied to clipboard',
-                  });
-                }}
-                className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-              >
-                Copy to Clipboard
-              </button>
-              <button
-                onClick={() => setShowRawResponse(false)}
-                className="px-2 py-1 bg-gray-700 text-white rounded text-xs hover:bg-gray-600"
-              >
-                Hide
-              </button>
-            </div>
-          </div>
-          <div className="bg-gray-900 p-3 rounded border border-gray-700 text-gray-300 text-xs overflow-auto max-h-[200px]">
-            <pre>{rawResponse}</pre>
-          </div>
-          <div className="mt-2 text-xs text-yellow-500">
-            The AI response couldn't be parsed as valid JSON. Click "Attempt Repair" to try fixing it automatically, or copy to fix it manually, or try generating again.
-          </div>
-        </div>
-      )}
-      
-      <div className="flex-1 overflow-y-auto p-4">
-        {!learningPlan && !isLoading && !isFileUploading && (
-          <form onSubmit={handleGenerateLearningPath} className="max-w-2xl mx-auto">
-            <div className="mb-4">
-              <label htmlFor="goal" className="block text-sm font-medium text-gray-300 mb-1">
-                What do you want to learn?
-              </label>
-              <input
-                type="text"
-                id="goal"
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                placeholder="E.g., Python for beginners, React fundamentals, World History..."
-                className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="timeframe" className="block text-sm font-medium text-gray-300 mb-1">
-                Available timeframe
-              </label>
-              <select
-                id="timeframe"
-                value={timeframe}
-                onChange={(e) => setTimeframe(e.target.value)}
-                className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="1 week">1 week</option>
-                <option value="2 weeks">2 weeks</option>
-                <option value="1 month">1 month</option>
-                <option value="3 months">3 months</option>
-                <option value="6 months">6 months</option>
-              </select>
-            </div>
-            
-            <div className="mb-6">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="includeSchedule"
-                  checked={includeSchedule}
-                  onChange={(e) => setIncludeSchedule(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded"
-                />
-                <label htmlFor="includeSchedule" className="ml-2 text-sm font-medium text-gray-300">
-                  Include a suggested study schedule
-                </label>
-              </div>
-            </div>
-            
-            <button
-              type="submit"
-              disabled={isLoading || !goal.trim()}
-              className="w-full flex items-center justify-center p-3 mb-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <RiSendPlane2Line className="mr-2" />
-                  Generate Learning Path
-                </>
-              )}
-            </button>
-
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <div className="w-full border-t border-gray-700"></div>
-              </div>
-              <div className="relative flex justify-center">
-                <span className="px-2 bg-gray-900 text-sm text-gray-400">Or</span>
-              </div>
-            </div>
-
-            <label
-              htmlFor="plan-upload"
-              className={`w-full flex items-center justify-center p-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 cursor-pointer ${isFileUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {isFileUploading ? (
-                <>
-                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {pdfProcessingState === 'extracting' ? 'Extracting PDF...' : 'Uploading...'}
-                </>
-              ) : (
-                <>
-                  <RiUploadCloud2Line className="mr-2" />
-                  Upload Existing Plan (.txt, .md, .pdf)
-                </>
-              )}
-            </label>
-            <input
-              id="plan-upload"
-              type="file"
-              className="hidden"
-              accept=".txt,.md,.pdf"
+          
+          <label className="flex items-center gap-2 px-4 py-2 bg-[#282a36] text-white rounded-lg hover:bg-[#2d2d3a] cursor-pointer">
+            <RiUploadCloud2Line className="text-[#7c3aed]" /> Upload PDF
+            <input 
+              type="file" 
+              accept=".pdf"
               onChange={handleFileUpload}
-              disabled={isFileUploading}
+              className="hidden"
             />
-
-          </form>
-        )}
-        
-        {learningPlan && !isLoading && !isFileUploading && (
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white mb-2">{learningPlan.title}</h2>
+          </label> */}
+          
+          {pdfProcessingState === 'extracting' && (
+            <div className="flex items-center gap-2 text-yellow-400">
+              <div className="animate-spin h-4 w-4 border-2 border-t-transparent border-yellow-400 rounded-full"></div>
+              Extracting text from PDF...
+            </div>
+          )}
+          {pdfProcessingState === 'generating' && (
+            <div className="flex items-center gap-2 text-[#7c3aed]">
+              <div className="animate-spin h-4 w-4 border-2 border-t-transparent border-[#7c3aed] rounded-full"></div>
+              Generating learning path from PDF...
+            </div>
+          )}
+        </div>
+        {/* Form and data display section */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {!learningPlan && !isLoading && !isFileUploading && (
+            <form onSubmit={handleGenerateLearningPath} className=""> 
+              <div className="mb-4">
+                <label htmlFor="goal" className="block text-sm font-medium text-gray-300 mb-1">
+                  What do you want to learn?
+                </label>
+                <input
+                  type="text"
+                  id="goal"
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
+                  placeholder="E.g., Python for beginners, React fundamentals, World History..."
+                  className="w-full p-3 bg-[#1a1b26] text-white rounded-lg focus:outline-none focus:border-[#7c3aed]"
+                  required
+                />
               </div>
-              <p className="text-gray-300">{learningPlan.description}</p>
-            </div>
-            
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold text-white mb-3">Learning Modules</h3>
-              {learningPlan.modules.map((module, index) => (
-                <ModuleCard key={index} module={module} index={index} />
-              ))}
-            </div>
-            
-            {learningPlan.schedule && (
-              <ScheduleCard schedule={learningPlan.schedule} />
-            )}
-            
-            <div className="flex justify-center mt-6 space-x-4">
+              
+              <div className="mb-4">
+                <label htmlFor="timeframe" className="block text-sm font-medium text-gray-300 mb-1">
+                  Available timeframe
+                </label>
+                <div className="space-y-3">
+                  <div className="px-1">
+                    <input
+                      type="range"
+                      id="timeframe-slider"
+                      min="0"
+                      max="100"
+                      value={sliderPosition}
+                      onChange={handleSliderChange}
+                      className="w-full h-2 bg-[#44475a] rounded-lg appearance-none cursor-pointer"
+                      disabled={showCustomTimeframe}
+                      aria-label="Learning path timeframe slider"
+                      style={{
+                        background: `linear-gradient(to right, #7c3aed 0%, #7c3aed ${sliderPosition}%, #44475a ${sliderPosition}%, #44475a 100%)`
+                      }}
+                    />
+                    <div className="relative w-full h-6 mt-1">
+                      {sliderPresets.map((preset, index) => (
+                        <div 
+                          key={index} 
+                          className="absolute transform -translate-x-1/2" 
+                          style={{ left: `${preset.position}%` }}
+                        >
+                          <div className="w-0.5 h-1.5 bg-gray-400 mx-auto"></div>
+                          <span className="text-xs text-gray-400 whitespace-nowrap">{preset.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Current timeframe value */}
+                  <div className="flex justify-between items-center">
+                    <div className="text-white text-lg font-medium">
+                      {showCustomTimeframe ? customTimeframe : getTimeframeFromDays(getCurrentDays())}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleCustomTimeframe}
+                      className="text-xs px-2 py-1 rounded bg-[#282a36] text-[#7c3aed] hover:bg-[#2d2d3a] flex items-center"
+                    >
+                      <RiEdit2Line className="mr-1" />
+                      {showCustomTimeframe ? "Use Slider" : "Custom"}
+                    </button>
+                  </div>
+                  
+                  {/* Custom timeframe input */}
+                  {showCustomTimeframe && (
+                    <div className="flex items-center mt-2">
+                      <input
+                        type="text"
+                        value={customTimeframe}
+                        onChange={handleCustomTimeframeChange}
+                        placeholder="E.g., 5 weeks, 7 months, etc."
+                        className="flex-1 p-3 bg-[#1a1b26] text-white rounded-lg focus:outline-none focus:border-[#7c3aed]"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="includeSchedule"
+                    checked={includeSchedule}
+                    onChange={(e) => setIncludeSchedule(e.target.checked)}
+                    className="w-4 h-4 text-[#7c3aed] focus:ring-[#7c3aed] border-gray-600 rounded"
+                  />
+                  <label htmlFor="includeSchedule" className="ml-2 text-sm font-medium text-gray-300">
+                    Include a suggested study schedule
+                  </label>
+                </div>
+              </div>
+              
               <button
-                onClick={() => setLearningPlan(null)}
-                className="px-4 py-2 text-sm text-blue-400 hover:text-blue-300"
+                type="submit"
+                disabled={isLoading || !goal.trim()}
+                className="w-full flex items-center justify-center p-3 mb-4 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create or Upload New Plan
-              </button>
-              <button
-                onClick={saveToWorkspace}
-                disabled={isSavingToWorkspace}
-                className="flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSavingToWorkspace ? (
+                {isLoading ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
+                    <div className="animate-spin h-5 w-5 border-2 border-t-transparent border-white rounded-full mr-2"></div>
+                    Generating...
                   </>
                 ) : (
                   <>
-                    <RiFileAddLine className="mr-1.5" />
-                    Add to Workspace
+                    <RiSendPlane2Line className="mr-2" />
+                    Generate Learning Path
                   </>
                 )}
               </button>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-[#44475a]"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="px-2 bg-[#1a1b26] text-sm text-gray-400">Or</span>
+                </div>
+              </div>
+
+              <label
+                htmlFor="plan-upload"
+                className={`w-full flex items-center justify-center p-3 bg-[#282a36] text-white rounded-lg hover:bg-[#2d2d3a] cursor-pointer ${isFileUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {isFileUploading ? (
+                  <>
+                    <div className="animate-spin h-5 w-5 border-2 border-t-transparent border-white rounded-full mr-2"></div>
+                    {pdfProcessingState === 'extracting' ? 'Extracting PDF...' : 'Uploading...'}
+                  </>
+                ) : (
+                  <>
+                    <RiUploadCloud2Line className="mr-2" />
+                    Upload Existing Plan (.txt, .md, .pdf)
+                  </>
+                )}
+              </label>
+              <input
+                id="plan-upload"
+                type="file"
+                className="hidden"
+                accept=".txt,.md,.pdf"
+                onChange={handleFileUpload}
+                disabled={isFileUploading}
+              />
+            </form>
+          )}
+          
+          {learningPlan && !isLoading && !isFileUploading && (
+            <div className=""> 
+              <div className="mb-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-white mb-2">{learningPlan.title}</h2>
+                </div>
+                <p className="text-gray-300">{learningPlan.description}</p>
+              </div>
+              
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-white mb-3">Learning Modules</h3>
+                {learningPlan.modules.map((module, index) => (
+                  <ModuleCard key={index} module={module} index={index} />
+                ))}
+              </div>
+              
+              {learningPlan.schedule && (
+                <ScheduleCard schedule={learningPlan.schedule} />
+              )}
+              
+              <div className="flex justify-center mt-6 space-x-4">
+                <button
+                  onClick={() => setLearningPlan(null)}
+                  className="px-4 py-2 text-sm text-violet-400 hover:text-violet-300"
+                >
+                  Create or Upload New Plan
+                </button>
+                <button
+                  onClick={saveToWorkspace}
+                  disabled={isSavingToWorkspace}
+                  className="flex items-center px-3 py-1.5 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingToWorkspace ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <RiFileAddLine className="mr-1.5" />
+                      Add to Workspace
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Text Paste Modal */}
+        {showTextPasteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-white">Paste Text Content</h3>
+                <button 
+                  onClick={() => setShowTextPasteModal(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  &times;
+                </button>
+              </div>
+              
+              <form onSubmit={handlePastedTextSubmit} className="p-4 flex-1 flex flex-col">
+                <p className="text-gray-300 mb-4">
+                  PDF processing failed. You can paste the text content from your document directly:
+                </p>
+                
+                <textarea 
+                  value={pastedText}
+                  onChange={(e) => setPastedText(e.target.value)}
+                  placeholder="Paste your text here..."
+                  className="w-full flex-1 min-h-[200px] p-3 bg-gray-700 rounded-lg border border-gray-600 text-white resize-none mb-4"
+                />
+                
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowTextPasteModal(false)}
+                    className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Process Text
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
       </div>
-
-      {/* Text Paste Modal */}
-      {showTextPasteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-white">Paste Text Content</h3>
-              <button 
-                onClick={() => setShowTextPasteModal(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                &times;
-              </button>
-            </div>
-            
-            <form onSubmit={handlePastedTextSubmit} className="p-4 flex-1 flex flex-col">
-              <p className="text-gray-300 mb-4">
-                PDF processing failed. You can paste the text content from your document directly:
-              </p>
-              
-              <textarea 
-                value={pastedText}
-                onChange={(e) => setPastedText(e.target.value)}
-                placeholder="Paste your text here..."
-                className="w-full flex-1 min-h-[200px] p-3 bg-gray-700 rounded-lg border border-gray-600 text-white resize-none mb-4"
-              />
-              
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowTextPasteModal(false)}
-                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Process Text
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+    // </div>
   );
 };
-
-export default LearningPathPlanner; 

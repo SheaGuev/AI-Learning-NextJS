@@ -18,10 +18,10 @@ import React, { useMemo, useState, useEffect, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-import Logo from '../../../../public/cypresslogo.svg';
+import Ll from '@/components/icons/ll';
 import Loader from '../../../components/global/loader';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { MailCheck } from 'lucide-react';
+import { LayoutListIcon, MailCheck } from 'lucide-react';
 import { loginFormSchema } from '@/lib/types';
 import { actionSignUpUser } from '@/lib/server-actions/auth-actions';
 
@@ -117,9 +117,9 @@ const Signup = () => {
           className="w-full sm:justify-center sm:w-[400px] space-y-6 flex flex-col"
         >
           <Link href="/" className="w-full flex justify-left items-center">
-            <Image src={Logo} alt="cypress Logo" width={50} height={50} />
+            <Ll />
             <span className="font-semibold dark:text-white text-4xl first-letter:ml-2">
-              cypress.
+              Lateral Learning AI
             </span>
           </Link>
           <FormDescription className="text-foreground/60">

@@ -12,7 +12,7 @@ const TooltipWrapper:React.FC<TooltipWrapperProps> = ({children, tooltip}) => {
   return (
     <TooltipProvider>
         <Tooltip >
-            <TooltipTrigger>
+            <TooltipTrigger asChild>
                 {children}
             </TooltipTrigger>
             <TooltipContent 

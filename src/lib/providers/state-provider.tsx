@@ -132,14 +132,17 @@ const appReducer = (
       return {
         ...state,
         workspaces: state.workspaces.map((workspace) => {
-          return {
-            ...workspace,
-            folders: [...workspace.folders, action.payload.folder].sort(
-              (a, b) =>
-                new Date(a.createdAt).getTime() -
-                new Date(b.createdAt).getTime()
-            ),
-          };
+          if (workspace.id === action.payload.workspaceId) {
+            return {
+              ...workspace,
+              folders: [...workspace.folders, action.payload.folder].sort(
+                (a, b) =>
+                  new Date(a.createdAt).getTime() -
+                  new Date(b.createdAt).getTime()
+              ),
+            };
+          }
+          return workspace;
         }),
       };
     case 'UPDATE_FOLDER':
@@ -228,7 +231,7 @@ const appReducer = (
           if (workspace.id === action.payload.workspaceId) {
             return {
               ...workspace,
-              folder: workspace.folders.map((folder) => {
+              folders: workspace.folders.map((folder) => {
                 if (folder.id === action.payload.folderId) {
                   return {
                     ...folder,

@@ -18,7 +18,7 @@ import { Subscription, workspace } from '../../supabase/supabase';
 import { Button } from '../ui/button';
 import Loader from '../global/loader';
 import { createWorkspace } from '../../supabase/queries';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAppState } from '../../lib/providers/state-provider';
 import { createBClient } from '@/lib/server-actions/createClient';
@@ -50,7 +50,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
   } = useForm<z.infer<typeof createWorkspaceFormSchema>>({
     mode: 'onChange',
     defaultValues: {
-      logo: '',
+      // logo: '', // Logo field commented out
       workspaceName: '',
     },
   });
@@ -63,6 +63,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
     const workspaceUUID = v4();
     console.log(file);
 
+    /* Commenting out workspace logo upload logic
     if (file) {
       try {
         const { data, error } = await supabase.storage
@@ -81,6 +82,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
         });
       }
     }
+    */
     try {
       const newWorkspace: workspace = {
         data: null,
@@ -90,7 +92,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
         inTrash: '',
         title: value.workspaceName,
         workspaceOwner: user.id,
-        logo: filePath || null,
+        logo: null, // filePath || null,
         bannerUrl: '',
       };
       const { data, error: createError } = await createWorkspace(newWorkspace);
@@ -145,7 +147,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
             >
               <div className="text-5xl">
                 <EmojiPicker getValue={(emoji) => setSelectedEmoji(emoji)}>
-                  {selectedEmoji}
+                  <span className="cursor-pointer inline-flex">{selectedEmoji}</span>
                 </EmojiPicker>
               </div>
               <div className="w-full ">
@@ -171,6 +173,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
                 </small>
               </div>
             </div>
+            {/* Commenting out workspace logo section
             <div>
               <Label
                 htmlFor="logo"
@@ -193,18 +196,8 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
               <small className="text-red-600">
                 {errors?.logo?.message?.toString()}
                </small>
-              
-              {/* {subscription?.status !== 'active' && (
-                <small
-                  className="
-                  text-muted-foreground
-                  block
-              "
-                >
-                  To customize your workspace, you need to be on a Pro Plan
-                </small> 
-              )} */}
             </div>
+            */}
             <div className="self-end">
               <Button
                 disabled={isLoading}

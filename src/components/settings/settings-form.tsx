@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { useAppState } from '@/lib/providers/state-provider';
 import { User, workspace } from '@/supabase/supabase';
 import { useSupabaseUser } from '@/lib/providers/supabase-user-provider';
@@ -70,26 +70,58 @@ const SettingsForm = () => {
   const [collaborators, setCollaborators] = useState<User[] | []>([]);
   const [openAlertMessage, setOpenAlertMessage] = useState(false);
   const [workspaceDetails, setWorkspaceDetails] = useState<workspace>();
-//   const titleTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); //referemce pr mi;; cjamge 
   const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState({
+    gemini: false,
+    googleSearch: false,
+    searchEngineId: false
+  });
 
-  //WIP PAYMENT PORTAL
+  // Check API key status on mount and when localStorage changes
+  useEffect(() => {
+    const checkApiKeyStatus = () => {
+      setApiKeyStatus({
+        gemini: !!localStorage.getItem('gemini_api_key'),
+        googleSearch: !!localStorage.getItem('google_search_api_key'),
+        searchEngineId: !!localStorage.getItem('google_search_engine_id')
+      });
+    };
+    
+    // Check initially
+    checkApiKeyStatus();
+    
+    // Listen for storage events (changes from other tabs/windows)
+    window.addEventListener('storage', checkApiKeyStatus);
+    
+    return () => {
+      window.removeEventListener('storage', checkApiKeyStatus);
+    };
+  }, []);
 
-//   const redirectToCustomerPortal = async () => {
-//     setLoadingPortal(true);
-//     try {
-//       const { url, error } = await postData({
-//         url: '/api/create-portal-link',
-//       });
-//       window.location.assign(url);
-//     } catch (error) {
-//       console.log(error);
-//       setLoadingPortal(false);
-//     }
-//     setLoadingPortal(false);
-//   };
+  // Handle API key updates
+  const handleApiKeyChange = (key: string, value: string) => {
+    if (value.trim()) {
+      localStorage.setItem(key, value.trim());
+      
+      // Update the API key status
+      setApiKeyStatus(prev => {
+        const newStatus = { ...prev };
+        if (key === 'gemini_api_key') newStatus.gemini = true;
+        if (key === 'google_search_api_key') newStatus.googleSearch = true;
+        if (key === 'google_search_engine_id') newStatus.searchEngineId = true;
+        return newStatus;
+      });
+      
+      toast({
+        title: "API Key Saved",
+        description: `Your ${key.replace(/_/g, ' ').replace(/api key/i, 'API key')} has been saved.`,
+      });
+    }
+  };
+  
   //addcollborators
   const addCollaborator = async (profile: User) => {
     if (!workspaceId) {
@@ -136,19 +168,6 @@ const SettingsForm = () => {
   };
 
   //on change
-<<<<<<< Updated upstream
-//   const workspaceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     if (!workspaceId || !e.target.value) return;
-//     dispatch({
-//       type: 'UPDATE_WORKSPACE',
-//       payload: { workspace: { title: e.target.value }, workspaceId },
-//     });
-//     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
-//     titleTimerRef.current = setTimeout(async () => {
-//       // await updateWorkspace({ title: e.target.value }, workspaceId);
-//     }, 500);
-//   };
-=======
   const workspaceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!workspaceId) {
       console.error("Cannot update name: workspaceId is undefined");
@@ -195,7 +214,6 @@ const SettingsForm = () => {
       }
     }, 500);
   };
->>>>>>> Stashed changes
 
   const onChangeWorkspaceLogo = async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -307,6 +325,22 @@ const SettingsForm = () => {
     fetchCollaborators();
   }, [workspaceId]);
 
+  //WIP PAYMENT PORTAL
+
+//   const redirectToCustomerPortal = async () => {
+//     setLoadingPortal(true);
+//     try {
+//       const { url, error } = await postData({
+//         url: '/api/create-portal-link',
+//       });
+//       window.location.assign(url);
+//     } catch (error) {
+//       console.log(error);
+//       setLoadingPortal(false);
+//     }
+//     setLoadingPortal(false);
+//   };
+
   return (
     <div className="flex gap-4 flex-col">
       <p className="flex items-center gap-2 mt-6">
@@ -325,7 +359,7 @@ const SettingsForm = () => {
           name="workspaceName"
           value={workspaceDetails ? workspaceDetails.title : ''}
           placeholder="Workspace Name"
-        //   onChange={workspaceNameChange}
+          onChange={workspaceNameChange}
         />
         {/* Workspace Logo upload disabled temporarily
         <Label
@@ -493,7 +527,10 @@ const SettingsForm = () => {
             onClick={async () => {
               if (!workspaceId) return;
               await deleteWorkspace(workspaceId);
-              toast({ title: 'Successfully deleted your workspae' });
+              toast({ 
+                title: 'Successfully deleted your workspace',
+                description: 'Your workspace and all associated data have been permanently deleted.' 
+              });
               dispatch({ type: 'DELETE_WORKSPACE', payload: workspaceId });
               router.replace('/dashboard');
             }}
@@ -501,83 +538,92 @@ const SettingsForm = () => {
             Delete Workspace
           </Button>
         </Alert>
+        
+        
+        {/* API Keys Section */}
         <p className="flex items-center gap-2 mt-6">
-          <UserIcon size={20} /> Profile
+          <Lock size={20} /> API Keys
         </p>
         <Separator />
-        <div className="flex items-center">
-          <Avatar>
-            <AvatarImage src={''} />
-            <AvatarFallback>
-              <CgProfile />
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col ml-6">
-            <small className="text-muted-foreground cursor-not-allowed">
-              {user ? user.email : ''}
-            </small>
+        <div className="flex flex-col gap-4">
+          <div>
             <Label
-              htmlFor="profilePicture"
-              className="text-sm text-muted-foreground"
+              htmlFor="geminiApiKey"
+              className="text-sm text-muted-foreground flex items-center gap-2"
             >
-              Profile Picture
+              Gemini API Key
+              <span className={`inline-block w-2 h-2 rounded-full ${apiKeyStatus.gemini ? 'bg-green-500' : 'bg-red-500'}`} title={apiKeyStatus.gemini ? 'API Key Set' : 'API Key Not Set'}></span>
             </Label>
-            <Input
-              name="profilePicture"
-              type="file"
-              accept="image/*"
-              placeholder="Profile Picture"
-              // onChange={onChangeProfilePicture}
-              disabled={uploadingProfilePic}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="geminiApiKey"
+                type="password"
+                placeholder="Enter your Gemini API key"
+                defaultValue={localStorage.getItem('gemini_api_key') || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  handleApiKeyChange('gemini_api_key', value);
+                }}
+              />
+              <a 
+                href="https://ai.google.dev/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-blue-500 hover:underline"
+              >
+                Get Key
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Used for AI text generation and content formatting
+            </p>
+          </div>
+          
+
+          
+          
+          
+          <div className="mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                // Clear all API keys from localStorage
+                localStorage.removeItem('gemini_api_key');
+                localStorage.removeItem('google_search_api_key');
+                localStorage.removeItem('google_search_engine_id');
+                
+                // Reset the input fields
+                const inputs = document.querySelectorAll('input[id^="gemini"], input[id^="google"], input[id^="search"]');
+                inputs.forEach((input) => {
+                  if (input instanceof HTMLInputElement) {
+                    input.value = '';
+                  }
+                });
+                
+                // Reset the API key status
+                setApiKeyStatus({
+                  gemini: false,
+                  googleSearch: false,
+                  searchEngineId: false
+                });
+                
+                toast({
+                  title: "API Keys Cleared",
+                  description: "All API keys have been removed from your browser.",
+                  variant: "default",
+                });
+              }}
+            >
+              Clear API Keys
+            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              This will remove all API keys from your browser's local storage
+            </p>
           </div>
         </div>
-        <MdLogout>
-          <div className="flex items-center">
-            <LogOut />
-          </div>
-        </MdLogout>
-        <p className="flex items-center gap-2 mt-6">
-          <CreditCard size={20} /> Billing & Plan
-        </p>
-        <Separator />
-        <p className="text-muted-foreground">
-          You are currently on a{' '}
-          {subscription?.status === 'active' ? 'Pro' : 'Free'} Plan
-        </p>
-        <Link
-          href="/"
-          target="_blank"
-          className="text-muted-foreground flex flex-row items-center gap-2"
-        >
-          View Plans <ExternalLink size={16} />
-        </Link>
-        {subscription?.status === 'active' ? (
-          <div>
-            <Button
-              type="button"
-              size="sm"
-              variant={'secondary'}
-              disabled={loadingPortal}
-              className="text-sm"
-            //   onClick={redirectToCustomerPortal}
-            >
-              Manage Subscription
-            </Button>
-          </div>
-        ) : (
-          <div>
-            <Button
-              type="button"
-              size="sm"
-              variant={'secondary'}
-              className="text-sm"
-            //   onClick={() => setOpen(true)}
-            >
-              Start Plan
-            </Button>
-          </div>
-        )}
+        
+        
       </>
       <AlertDialog open={openAlertMessage}>
         <AlertDialogContent>

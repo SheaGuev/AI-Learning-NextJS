@@ -1,0 +1,67 @@
+/* Styles for Markdown tables */
+
+.quill-markdown-table {
+  margin: 15px 0;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.quill-markdown-table table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0;
+  font-family: inherit;
+}
+
+.quill-markdown-table table th {
+  background-color: #f3f4f6;
+  color: #111827;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+}
+
+.quill-markdown-table table td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.quill-markdown-table table tr:nth-child(even) td {
+  background-color: #f9fafb;
+}
+
+/* Dark mode */
+.dark .quill-markdown-table table th {
+  background-color: #374151;
+  color: #f9fafb;
+  border-color: #4b5563;
+}
+
+.dark .quill-markdown-table table td {
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+.dark .quill-markdown-table table tr:nth-child(even) td {
+  background-color: #1f2937;
+}
+
+/* Hover effects */
+.quill-markdown-table table tr:hover td {
+  background-color: rgba(209, 213, 219, 0.4);
+}
+
+.dark .quill-markdown-table table tr:hover td {
+  background-color: rgba(55, 65, 81, 0.7);
+}
+
+/* Responsive tables */
+@media (max-width: 640px) {
+  .quill-markdown-table {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+} 

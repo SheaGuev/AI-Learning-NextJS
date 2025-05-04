@@ -2,9 +2,9 @@
 import { createBClient } from '@/lib/server-actions/createClient';
 import { workspace } from '@/supabase/supabase';
 // import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import Image from 'next/image';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
+import { FiBookOpen } from 'react-icons/fi';
 
 interface SelectedWorkspaceProps {
   workspace: workspace;
@@ -36,27 +36,22 @@ const SelectedWorkspace: React.FC<SelectedWorkspaceProps> = ({
       hover:bg-muted 
       transition-all 
       flex-row 
-      p-2 
+      p-3 
       gap-4 
       justify-center 
       cursor-pointer 
       items-center 
       my-2"
     >
-      <Image
-        src={workspaceLogo}
-        alt="workspace logo"
-        width={26}
-        height={26}
-        objectFit="cover"
-      />
+      <FiBookOpen className="h-8 w-8 text-violet-500" />
       <div className="flex flex-col">
         <p
           className="text-lg 
         w-[170px] 
         overflow-hidden 
         overflow-ellipsis 
-        whitespace-nowrap"
+        whitespace-nowrap
+        font-medium"
         >
           {workspace.title}
         </p>

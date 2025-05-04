@@ -82,7 +82,7 @@ interface LearningPlanStub {
 
 export function parseUploadedPlan(content: string): LearningPlanStub | null {
   if (!content) return null;
-
+  
   const lines = content.split('\n').map(line => line.trim());
   let plan: Partial<LearningPlanStub> = { modules: [] };
   let currentModule: Partial<LearningModuleStub> | null = null;
@@ -202,7 +202,7 @@ export function parseUploadedPlan(content: string): LearningPlanStub | null {
 
   console.warn("Parsing failed: Could not extract minimum required fields (title, modules).");
   return null; // Parsing failed or incomplete
-}
+  }
 
 // Local type definitions that mirror the ones in the planner component
 interface LearningModule {

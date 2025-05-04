@@ -25,18 +25,23 @@ const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
 
   useEffect(() => {
     if (!state.workspaces.length) {
+      const workspacesWithEmptyFolders = [
+        ...privateWorkspaces,
+        ...sharedWorkspaces,
+        ...collaboratingWorkspaces,
+      ].map((workspace) => ({ 
+        ...workspace, 
+        folders: [] 
+      }));
+      
       dispatch({
         type: 'SET_WORKSPACES',
         payload: {
-          workspaces: [
-            ...privateWorkspaces,
-            ...sharedWorkspaces,
-            ...collaboratingWorkspaces,
-          ].map((workspace) => ({ ...workspace, folders: [] })),
+          workspaces: workspacesWithEmptyFolders,
         },
       });
     }
-  }, [privateWorkspaces, collaboratingWorkspaces, sharedWorkspaces]);
+  }, [privateWorkspaces, collaboratingWorkspaces, sharedWorkspaces, dispatch]);
 
   const handleSelect = (option: workspace) => {
     setSelectedOption(option);
@@ -54,10 +59,12 @@ const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
     <div
       className=" relative inline-block
       text-left scrollbar-thin over over
+      w-full 
   "
     >
       <div>
-        <span onClick={() => setIsOpen(!isOpen)}>
+        <span onClick={() => setIsOpen(!isOpen)}
+              className="text-base cursor-pointer text-gray-50 ">
           {selectedOption ? (
             <SelectedWorkspace workspace={selectedOption} />
           ) : (
@@ -73,22 +80,21 @@ const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
           rounded-md
           shadow-md
           z-50
-          h-[190px]
-          bg-black/10
-          backdrop-blur-lg
+          h-[240px]
+          bg-black
           group
           overflow-scroll
           border-[1px]
-          border-muted
+          border-gray-800
           overflow-x-hidden
       "
         >
           <div className="rounded-md flex flex-col">
-            <div className="!p-2">
+            <div className="!p-4">
               {!!privateWorkspaces.length && (
                 <>
-                  <p className="text-muted-foreground">Private</p>
-                  <hr></hr>
+                  <p className="text-muted-foreground text-base font-medium mb-1">Private</p>
+                  <hr className="mb-2"></hr>
                   {privateWorkspaces.map((option) => (
                     <SelectedWorkspace
                       key={option.id}
@@ -100,8 +106,8 @@ const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
               )}
               {!!sharedWorkspaces.length && (
                 <>
-                  <p className="text-muted-foreground">Shared</p>
-                  <hr />
+                  <p className="text-muted-foreground text-base font-medium mb-1 mt-3">Shared</p>
+                  <hr className="mb-2" />
                   {sharedWorkspaces.map((option) => (
                     <SelectedWorkspace
                       key={option.id}
@@ -113,8 +119,8 @@ const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
               )}
               {!!collaboratingWorkspaces.length && (
                 <>
-                  <p className="text-muted-foreground">Collaborating</p>
-                  <hr />
+                  <p className="text-muted-foreground text-base font-medium mb-1 mt-3">Collaborating</p>
+                  <hr className="mb-2" />
                   {collaboratingWorkspaces.map((option) => (
                     <SelectedWorkspace
                       key={option.id}
@@ -137,15 +143,16 @@ const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
               justify-center 
               items-center 
               gap-2 
-              p-2 
-              w-full"
+              p-3 
+              w-full
+              text-base"
               >
                 <article
                   className="text-slate-500 
                 rounded-full
                  bg-slate-800 
-                 w-4 
-                 h-4 
+                 w-5 
+                 h-5 
                  flex 
                  items-center 
                  justify-center"

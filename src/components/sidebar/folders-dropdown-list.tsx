@@ -7,7 +7,7 @@ import { PlusIcon } from 'lucide-react';
 import { useSupabaseUser } from '@/lib/providers/supabase-user-provider';
 import { v4 } from 'uuid';
 import { createFolder } from '@/supabase/queries';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { Accordion } from '../ui/accordion';
 import TooltipWrapper from '../global/tooltip-wrapper';
 import Dropdown from './Dropdown';
@@ -68,7 +68,7 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
       id: v4(),
       createdAt: new Date().toISOString(),
       title: 'Untitled',
-      iconId: '📄',
+      iconId: '📂',
       inTrash: null,
       workspaceId,
       bannerUrl: '',
@@ -99,33 +99,34 @@ const FoldersDropdownList: React.FC<FoldersDropdownListProps> = ({
         sticky 
         z-20 
         top-0 
-        bg-background 
+        bg-neutral-950
         w-full  
         h-10 
         group/title 
         justify-between 
         items-center 
         pr-4 
-        text-Neutrals/neutrals-8
+        pl-2
+        text-neutral-100
   "
       >
         <span
-          className="text-Neutrals-8 
+          className="text-neutral-300
         font-bold 
-        text-xs"
+        text-sm"
         >
           FOLDERS
         </span>
         <TooltipWrapper tooltip="Create Folder">
-          <PlusIcon
-            onClick={addFolderHandler}
-            size={18}
-            className="group-hover/title:inline-block
-            hidden 
-            cursor-pointer
-            hover:dark:text-white
-          "
-          />
+          <span className="inline-flex p-1 hover:bg-slate-600 rounded-full transition-colors opacity-0 group-hover/title:opacity-100 transition-opacity duration-200 ease-in-out">
+            <PlusIcon
+              onClick={addFolderHandler}
+              size={16}
+              className="cursor-pointer
+              hover:dark:text-white
+            "
+            />
+          </span>
         </TooltipWrapper>
       </div>
       <Accordion

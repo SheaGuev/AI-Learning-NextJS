@@ -1,6 +1,8 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import '../styles/ai-dialog.css';
+import { useToast } from '@/lib/hooks/use-toast';
+import { usePDFExtractor } from '@/lib/hooks/use-pdf-extractor';
 
 // Define text length options
 export type TextLengthOption = 'short' | 'medium' | 'long' | 'verylong' | 'custom';
@@ -40,20 +42,25 @@ const TEXT_LENGTH_OPTIONS: TextLengthConfig[] = [
 ];
 
 interface AIPromptDialogProps {
-  onSubmit: (prompt: string, length: TextLengthOption) => void;
+  onSubmit: (prompt: string, length: TextLengthOption, pdfText?: string) => void;
   onCancel: () => void;
   isOpen: boolean;
 }
 
-const AIPromptDialog: React.FC<AIPromptDialogProps> = ({ 
+export const AIPromptDialog: React.FC<AIPromptDialogProps> = ({ 
   onSubmit, 
   onCancel,
   isOpen 
 }) => {
   const [prompt, setPrompt] = useState('');
   const [textLength, setTextLength] = useState<TextLengthOption>('medium');
+  const [isPdfUploading, setIsPdfUploading] = useState(false);
+  const [pdfText, setPdfText] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const { extractFullText } = usePDFExtractor();
 
   useEffect(() => {
     if (isOpen) {
@@ -61,21 +68,52 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
         inputRef.current.focus();
       }
     } else {
-      setLoading(false);
+      setIsPdfUploading(false);
+      setPdfText(null);
       setPrompt('');
       setTextLength('medium'); // Reset to default length
+      setIsSubmitting(false);
     }
   }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    
+    if (isSubmitting) {
+      console.log('AI Dialog: Submit already in progress, preventing duplicate submission');
+      return;
+    }
     
     const submitPrompt = async () => {
+      setIsSubmitting(true);
+      console.log('AI Dialog: Starting submit process');
+      
       try {
-        await onSubmit(prompt, textLength);
+        // Check if prompt is empty
+        if (!prompt.trim()) {
+          console.error('AI Dialog: Empty prompt submitted');
+          toast({
+            title: 'Empty prompt',
+            description: 'Please enter a prompt before generating text.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Add the instruction to prevent markdown code blocks internally
+        const enhancedPrompt = `${prompt}\n\nImportant: Do not wrap your response in markdown code blocks (like \`\`\`markdown ... \`\`\`).`;
+        console.log('AI Dialog: Submitting enhanced prompt', { promptLength: enhancedPrompt.length });
+        
+        await onSubmit(enhancedPrompt, textLength, pdfText || undefined);
+        console.log('AI Dialog: onSubmit completed successfully');
+        // Dialog will be closed by parent component
+      } catch (error) {
+        console.error('AI Dialog: Error in submit process:', error);
+        // Let the parent component handle closing
       } finally {
-        setLoading(false);
+        setPdfText(null);
+        setIsSubmitting(false);
       }
     };
     
@@ -83,8 +121,52 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
   };
 
   const handleCancel = () => {
-    setLoading(false);
+    console.log('AI Dialog: Close or Cancel button clicked');
+    setPdfText(null);
     onCancel();
+  };
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // Extract text from PDF
+      const extractedText = await extractFullText(file);
+      
+      if (extractedText.trim().length === 0) {
+        toast({
+          title: 'PDF Error',
+          description: 'Could not extract text from the PDF. It may be scanned or have content restrictions.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Set the extracted text as the prompt
+      setPrompt(extractedText);
+      
+      toast({
+        title: 'PDF Processed',
+        description: 'Text has been extracted from the PDF and added to your prompt.',
+      });
+    } catch (error: any) {
+      console.error('Error processing PDF:', error);
+      toast({
+        title: 'PDF Processing Error',
+        description: error.message || 'Failed to process PDF. Please try entering your prompt manually.',
+        variant: 'destructive',
+      });
+    } finally {
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handlePdfUploadClick = () => {
+    fileInputRef.current?.click();
   };
 
   if (!isOpen) return null;
@@ -97,7 +179,8 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
           <button 
             className="ai-prompt-close-btn" 
             onClick={handleCancel}
-            aria-label="Close"
+            aria-label="Close dialog"
+            data-testid="ai-prompt-close-btn"
           >
             ×
           </button>
@@ -116,6 +199,31 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
               rows={4}
               className="ai-prompt-input"
             />
+            
+            <div className="pdf-upload-container">
+              <button 
+                type="button"
+                onClick={handlePdfUploadClick}
+                className="pdf-upload-button"
+                disabled={isPdfUploading}
+              >
+                {isPdfUploading ? 'Processing PDF...' : 'Upload PDF'}
+              </button>
+              <input 
+                type="file"
+                ref={fileInputRef}
+                onChange={handlePdfUpload}
+                accept=".pdf"
+                style={{ display: 'none' }}
+                title="Upload PDF"
+              />
+              {pdfText && (
+                <div className="pdf-status">
+                  <span className="pdf-status-icon">✓</span>
+                  <span className="pdf-status-text">PDF content extracted ({Math.round(pdfText.length / 1000)}K characters)</span>
+                </div>
+              )}
+            </div>
             
             <div className="text-length-selector">
               <label className="length-label">Length:</label>
@@ -143,16 +251,16 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
               type="button" 
               className="ai-prompt-cancel-btn" 
               onClick={handleCancel}
-              disabled={loading}
+              disabled={isPdfUploading}
             >
               Cancel
             </button>
             <button 
               type="submit" 
               className="ai-prompt-submit-btn"
-              disabled={loading || !prompt.trim()}
+              disabled={isPdfUploading || !prompt.trim() || isSubmitting}
             >
-              {loading ? 'Generating...' : 'Generate'}
+              {isSubmitting ? 'Generating...' : (isPdfUploading ? 'Processing...' : 'Generate')}
             </button>
           </div>
         </form>

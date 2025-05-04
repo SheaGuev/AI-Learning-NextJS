@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/form';
 import Link from 'next/link';
 import Image from 'next/image';
-import Logo from '../../../../public/cypresslogo.svg';
+import Ll from '@/components/icons/ll';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Loader from '../../../components/global/loader';
@@ -80,24 +80,19 @@ const LoginPage = () => {
           justify-left
           items-center"
         >
-          <Image
-            src={Logo}
-            alt="cypress Logo"
-            width={50}
-            height={50}
-          />
+          <Ll />
           <span
             className="font-semibold
           dark:text-white text-4xl first-letter:ml-2"
           >
-            cypress.
+            Lateral Learning
           </span>
         </Link>
         <FormDescription
           className="
         text-foreground/60"
         >
-          An all-In-One Collaboration and Productivity Platform
+          An all-In-One AI-Powered Learning Platform
         </FormDescription>
         <FormField
           disabled={isLoading}

@@ -5,7 +5,7 @@ import { FiSearch, FiExternalLink, FiFolder, FiFile, FiChevronRight, FiChevronDo
 import { useAppState } from '@/lib/providers/state-provider';
 import { getFiles, getFolders, getFileDetails, updateFile } from '@/supabase/queries';
 import { File, Folder } from '@/supabase/supabase';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 
 interface SearchResult {
   title: string;
@@ -43,7 +43,7 @@ const FileTree: React.FC<{
       {items.map((item) => (
         <li key={item.id} className="py-1">
           <div 
-            className="flex items-center hover:bg-gray-700 rounded px-1 py-0.5 cursor-pointer text-sm"
+            className="flex items-center hover:bg-[#2d2d3a] rounded px-1 py-0.5 cursor-pointer text-sm"
             onClick={() => item.type === 'folder' ? toggleFolder(item.id) : toggleFileSelection(item)}
           >
             <div className="mr-1.5" style={{ marginLeft: `${level * 4}px` }}>
@@ -52,17 +52,19 @@ const FileTree: React.FC<{
               ) : (
                 <div className="w-4 h-4 flex justify-center items-center">
                   {selectedFiles[item.id] ? 
-                    <FiCheckSquare className="text-blue-500" /> : 
+                    <FiCheckSquare className="text-[#6052A8]" /> : 
                     <FiSquare className="text-gray-400" />
                   }
                 </div>
               )}
             </div>
-            {item.type === 'folder' ? (
-              <FiFolder className="mr-1.5 text-yellow-500" />
-            ) : (
-              <FiFile className="mr-1.5 text-blue-400" />
-            )}
+            <div className="flex items-center min-w-[20px]">
+              {item.type === 'folder' ? (
+                <FiFolder className="mr-1.5 text-[#6052A8]" />
+              ) : (
+                <FiFile className="mr-1.5 text-[#6052A8]" />
+              )}
+            </div>
             <span className="text-gray-300 truncate">{item.title}</span>
           </div>
           
@@ -517,175 +519,179 @@ const ResearchTool: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[600px] w-full max-w-6xl bg-gray-900 rounded-lg shadow-lg border border-gray-700">
-      <div className="p-4 border-b border-gray-700">
-        <h2 className="text-xl font-semibold text-white">Research Tool</h2>
-        <p className="text-gray-400 text-sm mt-1">Find relevant sources and references for your learning journey</p>
-        <div className="flex justify-end mt-2">
-          <button
-            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-            className="text-xs text-blue-400 hover:text-blue-300"
-          >
-            {showApiKeyInput ? 'Hide API Settings' : 'Set Search API'}
-          </button>
-        </div>
-      </div>
-      
-      {showApiKeyInput && (
-        <div className="p-3 border-b border-gray-700 bg-gray-800">
-          <div className="flex flex-col gap-2">
-            <input
-              type="password"
-              value={tempApiKey}
-              onChange={(e) => setTempApiKey(e.target.value)}
-              placeholder="Enter your Google API Key"
-              className="p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white placeholder-gray-400"
-            />
-            <input
-              type="text"
-              value={tempSearchEngineId}
-              onChange={(e) => setTempSearchEngineId(e.target.value)}
-              placeholder="Enter your Search Engine ID"
-              className="p-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white placeholder-gray-400"
-            />
-            <div className="mt-1 text-xs text-gray-400">
-              Get your API key at: <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">console.cloud.google.com</a>
-              <br />
-              Set up a search engine at: <a href="https://programmablesearchengine.google.com/create/new" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">programmablesearchengine.google.com</a>
-            </div>
-            <button
-              onClick={handleSaveApiSettings}
-              disabled={!tempApiKey.trim() || !tempSearchEngineId.trim()}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
-            >
-              Save
-            </button>
-            {apiKeySaved && (
-              <div className="text-center text-green-400 text-sm mt-2">API settings saved successfully!</div>
-            )}
-          </div>
-        </div>
-      )}
-      
-      <div className="p-4 border-b border-gray-700">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={selectedCount > 0 ? "Search with selected files as context..." : "Search for learning resources, documentation, or topics..."}
-            className="flex-1 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400 border border-gray-700"
-          />
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 flex items-center gap-2"
-          >
-            <FiSearch />
-            Search
-          </button>
-        </form>
-      </div>
-      
-      <div className="flex flex-1 overflow-hidden">
-        {/* Main results area */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-full">
-              <div className="animate-pulse text-gray-300">Searching...</div>
-            </div>
-          ) : results.length > 0 ? (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-200">
-                Search Results for "{query}" {selectedCount > 0 ? `(with ${selectedCount} files as context)` : ''}
-              </h3>
-              {errorMessage && (
-                <div className="bg-red-900/30 border border-red-700 p-3 rounded-md text-red-300 text-sm mb-4">
-                  {errorMessage}
-                </div>
-              )}
-              {usingMockResults && !errorMessage && (
-                <div className="bg-yellow-900/30 border border-yellow-700 p-3 rounded-md text-yellow-300 text-sm mb-4">
-                  Using sample results. Set up your Google Search API for real results.
-                </div>
-              )}
-              {results.map((result, index) => (
-                <div key={index} className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                  <div className="flex justify-between items-start">
-                    <h4 className="text-blue-400 font-medium">{result.title}</h4>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => addToSelectedFiles(result)}
-                        disabled={selectedCount === 0 || addingToFile === result.title}
-                        className={`text-xs flex items-center gap-1 px-2 py-1 rounded ${
-                          selectedCount > 0 
-                            ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' 
-                            : 'bg-gray-700/30 text-gray-500 cursor-not-allowed'
-                        }`}
-                        title={selectedCount > 0 ? "Add to selected files" : "Select files first"}
-                      >
-                        {addingToFile === result.title ? (
-                          <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent border-blue-400 animate-spin"></span>
-                        ) : (
-                          <FiPlus className="w-3 h-3" />
-                        )}
-                        {addingToFile === result.title ? "Adding..." : "Add to file"}
-                      </button>
-                      <a 
-                        href={result.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-500 hover:text-blue-400"
-                        title="Open link in new tab"
-                      >
-                        <FiExternalLink />
-                      </a>
-                    </div>
-                  </div>
-                  <p className="text-gray-300 text-sm mt-1">{result.description}</p>
-                  <div className="text-gray-500 text-xs mt-2 truncate">{result.url}</div>
-                </div>
-              ))}
-            </div>
-          ) : query ? (
-            <div className="text-center text-gray-400 mt-8">
-              No results found. Try a different search term.
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <FiSearch className="text-gray-600 text-5xl mb-4" />
-              <p className="text-gray-400">Search for a topic to find relevant resources</p>
-              {selectedCount > 0 && (
-                <p className="text-gray-500 text-sm mt-2">Using {selectedCount} files as context</p>
-              )}
-            </div>
-          )}
-        </div>
-        
-        {/* File Browser Side Panel */}
-        <div className="w-64 border-l border-gray-700 flex flex-col">
-          <div className="p-3 border-b border-gray-700">
-            <h3 className="text-sm font-semibold text-white">Files ({selectedCount} selected)</h3>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 text-sm">
-            <div className="text-gray-400 text-xs mb-2 px-2">Not in Trash</div>
-            
+    <div className="bg-[#1e1e2e] border border-[#4A4A67] rounded-lg p-5 shadow-lg">
+      <div className="flex flex-col space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* File Browser */}
+          <div className="lg:col-span-1 bg-[#282a36] rounded-lg p-4 max-h-[600px] overflow-auto">
+            <h3 className="text-[#8B5CF6] font-semibold mb-3 flex items-center">
+              <FiFolder className="mr-2" /> Files
+              <span className="ml-auto text-sm text-gray-400">
+                {selectedCount} selected
+              </span>
+            </h3>
             {isLoadingFiles ? (
-              <div className="text-gray-400 text-center p-4">Loading files...</div>
-            ) : fileStructure.length === 0 ? (
-              <div className="text-gray-400 text-center p-4">No files found</div>
-            ) : (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#8B5CF6]"></div>
+              </div>
+            ) : fileStructure.length > 0 ? (
               <FileTree 
-                items={fileStructure} 
-                level={0} 
+                items={fileStructure}
+                level={0}
                 expandedFolders={expandedFolders}
                 toggleFolder={toggleFolder}
                 selectedFiles={selectedFiles}
                 toggleFileSelection={toggleFileSelection}
               />
+            ) : (
+              <p className="text-gray-400 text-sm italic">No files found in this workspace</p>
             )}
           </div>
+
+          {/* Research and Results */}
+          <div className="lg:col-span-3 flex flex-col h-[600px] bg-[#282a36] rounded-lg overflow-hidden">
+            {/* Search Section */}
+            <div className="p-4 border-b border-[#44475a]">
+              <form onSubmit={handleSearch} className="flex items-center">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search for research topics..."
+                  className="flex-1 bg-[#1a1b26] text-white p-3 rounded-l-lg focus:outline-none focus:border-[#7c3aed]"
+                  disabled={isLoading}
+                />
+                <button
+                  type="submit"
+                  title="Search"
+                  className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white p-3 rounded-r-lg flex items-center"
+                  disabled={!query.trim() || isLoading}
+                >
+                  {isLoading ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-t-transparent border-white rounded-full"></div>
+                  ) : (
+                    <FiSearch />
+                  )}
+                </button>
+              </form>
+              {!apiKey && !searchEngineId && (
+                <button
+                  onClick={() => setShowApiKeyInput(true)}
+                  className="mt-2 text-xs text-[#8B5CF6] hover:text-[#9d5bff]"
+                >
+                  Set API key for real search results
+                </button>
+              )}
+            </div>
+
+            {/* Results List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {results.length === 0 && !isLoading ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                  <div className="bg-[#2d2d3a] p-5 rounded-xl mb-4">
+                    <FiSearch className="text-[#8B5CF6] mx-auto text-4xl mb-2" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Research Assistant</h3>
+                  <p className="text-gray-400 max-w-md">
+                    Search for topics to research. Your queries will be enhanced with context from your selected files.
+                  </p>
+                </div>
+              ) : (
+                results.map((result, index) => (
+                  <div key={index} className="bg-[#1a1b26] rounded-lg p-4">
+                    <h3 className="text-white font-medium mb-1">
+                      <a 
+                        href={result.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="hover:underline flex items-center"
+                      >
+                        {result.title}
+                        <FiExternalLink className="ml-2 text-sm text-[#8B5CF6]" />
+                      </a>
+                    </h3>
+                    <p className="text-gray-300 text-sm mb-2">{result.description}</p>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-xs text-gray-500 truncate max-w-[300px]">{result.url}</span>
+                      <button
+                        onClick={() => addToSelectedFiles(result)}
+                        disabled={addingToFile === result.url}
+                        className="flex items-center text-xs px-2 py-1 bg-[#2d2d3a] text-[#8B5CF6] rounded hover:bg-[#3d3d4d]"
+                      >
+                        {addingToFile === result.url ? (
+                          <div className="animate-spin h-3 w-3 border border-t-transparent border-[#8B5CF6] rounded-full mr-1"></div>
+                        ) : (
+                          <FiPlus className="mr-1" />
+                        )}
+                        Add to Notes
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* API Key Modal */}
+        {showApiKeyInput && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#282a36] rounded-lg max-w-md w-full p-6">
+              <h3 className="text-[#8B5CF6] font-semibold mb-4">Set Google Custom Search API</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={tempApiKey}
+                    onChange={(e) => setTempApiKey(e.target.value)}
+                    placeholder="Enter your Google API Key"
+                    className="w-full bg-[#1a1b26] text-white p-3 rounded-lg focus:outline-none focus:border-[#7c3aed]"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Search Engine ID
+                  </label>
+                  <input
+                    type="text"
+                    value={tempSearchEngineId}
+                    onChange={(e) => setTempSearchEngineId(e.target.value)}
+                    placeholder="Enter your Custom Search Engine ID"
+                    className="w-full bg-[#1a1b26] text-white p-3 rounded-lg focus:outline-none focus:border-[#7c3aed]"
+                  />
+                </div>
+                
+                {errorMessage && (
+                  <div className="text-red-500 text-sm">{errorMessage}</div>
+                )}
+                
+                <div className="text-xs text-gray-400">
+                  <p>Need API key? Get one at: <a href="https://developers.google.com/custom-search/v1/overview" target="_blank" rel="noopener noreferrer" className="text-[#8B5CF6] hover:underline">Google Custom Search API</a></p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowApiKeyInput(false)}
+                  className="px-4 py-2 rounded-lg text-gray-300 hover:bg-[#2d2d3a]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveApiSettings}
+                  className="px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#7C3AED] text-white"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

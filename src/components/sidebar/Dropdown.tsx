@@ -2,11 +2,7 @@
 import { useAppState } from '@/lib/providers/state-provider';
 import { createBClient } from '@/lib/server-actions/createClient';
 import { useRouter } from 'next/navigation';
-<<<<<<< Updated upstream
-import React, { useMemo, useState } from 'react';
-=======
-import React, { useMemo, useState, useEffect, useRef } from 'react';
->>>>>>> Stashed changes
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   AccordionContent,
   AccordionItem,
@@ -14,9 +10,9 @@ import {
 } from '../ui/accordion';
 import clsx from 'clsx';
 import EmojiPicker from '../global/emoji-picker';
-import { createFile, updateFile, updateFolder } from '@/supabase/queries';
+import { createFile, updateFile, updateFolder, getFiles } from '@/supabase/queries';
 
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/lib/hooks/use-toast"
 import TooltipWrapper from '../global/tooltip-wrapper';
 import { PlusIcon, Trash } from 'lucide-react';
 import { File } from '@/supabase/supabase';
@@ -41,42 +37,28 @@ const Dropdown: React.FC<DropdownProps> = ({
   disabled,
   ...props
 }) => {
+  // Add debugging log to check listType when component renders
+  // console.log(`Dropdown rendering: ${id} with listType=${listType}`);
+  
   const supabase = createBClient();
   const { toast } = useToast();
   const { user } = useSupabaseUser();
   const { state, dispatch, workspaceId, folderId } = useAppState();
   const [isEditing, setIsEditing] = useState(false);
   const router = useRouter();
-<<<<<<< Updated upstream
-
-=======
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
-  // Add ref for hover debugging
-  const itemRef = useRef<HTMLDivElement | null>(null);
-  const [isHovering, setIsHovering] = useState(false);
 
-  // Log when hover state changes
-  useEffect(() => {
-    console.log(`Hover state for ${listType} ${id}: ${isHovering}`);
-  }, [isHovering, id, listType]);
-
-  // Log when accordion state changes
-  useEffect(() => {
-    console.log(`Accordion state for ${id}: ${isAccordionOpen ? 'open' : 'closed'}`);
-  }, [isAccordionOpen, id]);
-  
   // Add detailed debugging for context values
   useEffect(() => {
-    console.log("Dropdown context values:", { 
-      componentId: id,
-      listType,
-      contextWorkspaceId: workspaceId, 
-      contextFolderId: folderId,
-      pathname: window.location.pathname
-    });
+    // console.log("Dropdown context values:", { 
+    //   componentId: id,
+    //   listType,
+    //   contextWorkspaceId: workspaceId, 
+    //   contextFolderId: folderId,
+    //   pathname: window.location.pathname
+    // });
   }, [id, listType, workspaceId, folderId]);
   
->>>>>>> Stashed changes
   //folder Title synced with server data and local
   const folderTitle: string | undefined = useMemo(() => {
     if (listType === 'folder') {
@@ -103,22 +85,61 @@ const Dropdown: React.FC<DropdownProps> = ({
   }, [state, listType, workspaceId, id, title]);
 
   //Navigate the user to a different page
-  const navigatatePage = (accordionId: string, type: string) => {
-    if (type === 'folder') {
-    //   router.push(`/dashboard/${workspaceId}/${accordionId}`);
-    return
+  const navigatePage = async (accordionId: string, type: string) => {
+    if (!workspaceId) {
+      console.error("Cannot navigate: workspaceId is undefined");
+      toast({
+        title: 'Navigation Error',
+        description: 'Workspace not found.',
+        variant: 'destructive',
+      });
+      return;
     }
-    if (type === 'file') {
-      router.push(
-        `/dashboard/${workspaceId}/${folderId}/${
-          accordionId.split('folder')[1]
-        }`
-      );
+    
+    try {
+      if (type === 'folder') {
+        console.log(`Navigating to folder: /dashboard/${workspaceId}/${accordionId}`);
+        await router.push(`/dashboard/${workspaceId}/${accordionId}`);
+        return;
+      }
+      
+      if (type === 'file') {
+        // For files, the ID is "{folderId}folder{fileId}" - extract both parts
+        const pathParts = accordionId.split('folder');
+        
+        if (pathParts.length !== 2 || !pathParts[0] || !pathParts[1]) {
+          console.error("Invalid file ID format", accordionId);
+          toast({
+            title: 'Navigation Error',
+            description: 'Invalid file format.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        // Use the folderId embedded in the file ID instead of context folderId
+        const fileFolderId = pathParts[0];
+        const actualFileId = pathParts[1];
+        
+        const url = `/dashboard/${workspaceId}/${fileFolderId}/${actualFileId}`;
+        console.log(`Navigating to file: ${url}`);
+        await router.push(url);
+      }
+    } catch (error) {
+      console.error("Navigation error:", error);
+      toast({
+        title: 'Navigation Failed',
+        description: 'Could not navigate to the requested page.',
+        variant: 'destructive',
+      });
     }
   };
 
-  //double click handler
-  const handleDoubleClick = () => {
+  // Modify the handleDoubleClick function to add debugging
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    // console.log(`Double click detected on ${listType}`, { id, listType });
+    e.preventDefault();
+    e.stopPropagation();
     setIsEditing(true);
   };
   //blur
@@ -127,55 +148,85 @@ const Dropdown: React.FC<DropdownProps> = ({
     if (!isEditing) return;
     setIsEditing(false);
     const fId = id.split('folder');
+    
+    // Handle folder title update
     if (fId?.length === 1) {
       if (!folderTitle) return;
+      console.log("Updating folder title in database:", { folderId: fId[0], title: folderTitle });
+      
       toast({
         title: 'Success',
         description: 'Folder title changed.',
       });
-      await updateFolder({ title }, fId[0]);
+      await updateFolder({ title: folderTitle }, fId[0]);
     }
 
+    // Handle file title update
     if (fId.length === 2 && fId[1]) {
       if (!fileTitle) return;
-      const { data, error } = await updateFile({ title: fileTitle }, fId[1]);
+      
+      const extractedFolderId = fId[0];
+      const extractedFileId = fId[1];
+      
+      console.log("Updating file title in database:", { 
+        fileId: extractedFileId, 
+        folderId: extractedFolderId,
+        title: fileTitle 
+      });
+      
+      const { data, error } = await updateFile({ title: fileTitle }, extractedFileId);
       if (error) {
+        console.error("Error updating file title:", error);
         toast({
           title: 'Error',
           variant: 'destructive',
           description: 'Could not update the title for this file',
         });
-      } else
+      } else {
+        console.log("File title updated successfully:", data);
         toast({
           title: 'Success',
           description: 'File title changed.',
         });
+      }
     }
   };
 
   //onchanges
   const onChangeEmoji = async (selectedEmoji: string) => {
-    if (!workspaceId) return;
+    if (!workspaceId || !selectedEmoji) return;
+    
+    // Only update if it's a folder
     if (listType === 'folder') {
-      dispatch({
-        type: 'UPDATE_FOLDER',
-        payload: {
-          workspaceId,
-          folderId: id,
-          folder: { iconId: selectedEmoji },
-        },
-      });
-      const { data, error } = await updateFolder({ iconId: selectedEmoji }, id);
-      if (error) {
+      // Update UI first
+      try {
+        dispatch({
+          type: 'UPDATE_FOLDER',
+          payload: {
+            workspaceId,
+            folderId: id,
+            folder: { iconId: selectedEmoji },
+          },
+        });
+      } catch (e) {
+        console.log('Error updating UI state:', e);
+      }
+      
+      // Then update database in the background
+      try {
+        await updateFolder({ iconId: selectedEmoji }, id);
+        
+        // Only show success toast if needed
+        // toast({
+        //   title: 'Success',
+        //   description: 'Updated emoji for the folder',
+        // });
+      } catch (error) {
+        console.log('Error updating folder emoji:', error);
         toast({
           title: 'Error',
+          description: 'Could not update the emoji',
           variant: 'destructive',
-          description: 'Could not update the emoji for this folder',
-        });
-      } else {
-        toast({
-          title: 'Success',
-          description: 'Update emoji for the folder',
         });
       }
     }
@@ -195,213 +246,269 @@ const Dropdown: React.FC<DropdownProps> = ({
     }
   };
   const fileTitleChange = (e: any) => {
-    if (!workspaceId || !folderId) return;
+    if (!workspaceId) {
+      console.log("Cannot update file title: workspaceId is undefined");
+      return;
+    }
+    
     const fid = id.split('folder');
+    // For files, the ID format is "{folderId}folder{fileId}"
     if (fid.length === 2 && fid[1]) {
+      const extractedFolderId = fid[0]; // Extract the folder ID from the file ID
+      const extractedFileId = fid[1];   // Extract the file ID
+      
+      console.log("Updating file title", { 
+        fileId: extractedFileId, 
+        folderId: extractedFolderId,
+        workspaceId,
+        newTitle: e.target.value 
+      });
+      
       dispatch({
         type: 'UPDATE_FILE',
         payload: {
           file: { title: e.target.value },
-          folderId,
+          folderId: extractedFolderId, // Use the extracted folder ID, not the context folderId
           workspaceId,
-          fileId: fid[1],
+          fileId: extractedFileId,
         },
       });
+    } else {
+      console.error("Invalid file ID format for title change:", id);
     }
   };
 
   //move to trash
-  const moveToTrash = async () => {
-    if (!user?.email || !workspaceId) return;
-    const pathId = id.split('folder');
-    if (listType === 'folder') {
-      dispatch({
-        type: 'UPDATE_FOLDER',
-        payload: {
-          folder: { inTrash: `Deleted by ${user?.email}` },
-          folderId: pathId[0],
-          workspaceId,
-        },
+  const moveToTrash = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent default browser behavior
+    e.stopPropagation(); // Prevent event propagation
+    
+    // console.log('moveToTrash function called', { id, listType });
+    
+    // Debug user context
+    // console.log('User context:', { 
+    //   userExists: !!user, 
+    //   userEmail: user?.email,
+    //   userID: user?.id,
+    //   workspaceId 
+    // });
+    
+    // Check if user is authenticated
+    if (!user?.email || !workspaceId) {
+      // console.log('Authentication error', { user, workspaceId });
+      
+      // Try to get the current session directly
+      try {
+        const supabase = createBClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        // console.log('Current session check:', sessionData);
+        
+        if (!sessionData.session) {
+          // console.log('No active session found in moveToTrash');
+          toast({
+            title: 'Authentication Required',
+            description: 'Please log in to move items to trash.',
+            variant: 'destructive',
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      }
+      
+      toast({
+        title: 'Error',
+        variant: 'destructive',
+        description: 'Authentication error. Please try again.',
       });
-      const { data, error } = await updateFolder(
-        { inTrash: `Deleted by ${user?.email}` },
-        pathId[0]
-      );
-      if (error) {
+      return;
+    }
+    
+    const pathId = id.split('folder');
+    // console.log('Path ID after splitting', { pathId, originalId: id });
+    
+    if (listType === 'folder') {
+      // console.log('Processing folder trash', { folderId: pathId[0] });
+      
+      try {
+        const deletedByMessage = user?.email ? `Deleted by ${user.email}` : 'Deleted';
+        
+        // Get files in this folder first
+        const folderFiles = state.workspaces
+          .find((workspace) => workspace.id === workspaceId)
+          ?.folders.find((folder) => folder.id === pathId[0])
+          ?.files.filter((file) => !file.inTrash) || [];
+          
+        // console.log(`Found ${folderFiles.length} files in folder to trash`, folderFiles);
+        
+        // 1. Update local state for the folder
+        dispatch({
+          type: 'UPDATE_FOLDER',
+          payload: {
+            folder: { inTrash: deletedByMessage },
+            folderId: pathId[0],
+            workspaceId,
+          },
+        });
+        // console.log('Dispatch for folder completed');
+        
+        // 2. Update local state for all files in the folder
+        for (const file of folderFiles) {
+          dispatch({
+            type: 'UPDATE_FILE',
+            payload: {
+              file: { inTrash: deletedByMessage },
+              folderId: pathId[0],
+              workspaceId,
+              fileId: file.id,
+            },
+          });
+          // console.log(`Marked file ${file.id} as trashed in UI`);
+        }
+        
+        // 3. Update folder in database
+        // console.log('Calling updateFolder with', { 
+        //   inTrash: deletedByMessage, 
+        //   folderId: pathId[0] 
+        // });
+        
+        const { data, error } = await updateFolder(
+          { inTrash: deletedByMessage },
+          pathId[0]
+        );
+        
+        if (error) {
+          console.error('Error moving folder to trash', error);
+          toast({
+            title: 'Error',
+            variant: 'destructive',
+            description: 'Could not move the folder to trash',
+          });
+          return;
+        }
+        
+        // 4. Update all files in database
+        const fileUpdatePromises = folderFiles.map(file => 
+          updateFile({ inTrash: deletedByMessage }, file.id)
+        );
+        
+        const fileResults = await Promise.allSettled(fileUpdatePromises);
+        const failedUpdates = fileResults.filter(result => result.status === 'rejected');
+        
+        if (failedUpdates.length > 0) {
+          console.warn(`${failedUpdates.length} file updates failed`, failedUpdates);
+          toast({
+            title: 'Partial Success',
+            description: `Folder moved to trash but some files may not have been trashed.`,
+            variant: 'default',
+          });
+        } else {
+          // console.log('Folder and all files successfully moved to trash', data);
+          toast({
+            title: 'Success',
+            description: `Moved folder and ${folderFiles.length} files to trash`,
+          });
+        }
+      } catch (err) {
+        console.error('Exception in folder trash operation', err);
         toast({
           title: 'Error',
           variant: 'destructive',
-          description: 'Could not move the folder to trash',
-        });
-      } else {
-        toast({
-          title: 'Success',
-          description: 'Moved folder to trash',
+          description: 'An unexpected error occurred',
         });
       }
     }
 
     if (listType === 'file') {
-      dispatch({
-        type: 'UPDATE_FILE',
-        payload: {
-          file: { inTrash: `Deleted by ${user?.email}` },
-          folderId: pathId[0],
-          workspaceId,
-          fileId: pathId[1],
-        },
-      });
-      const { data, error } = await updateFile(
-        { inTrash: `Deleted by ${user?.email}` },
-        pathId[1]
-      );
-      if (error) {
+      // console.log('Processing file trash', { filePathId: pathId });
+      
+      if (pathId.length !== 2 || !pathId[1]) {
+        console.error('Invalid file ID format', { pathId });
         toast({
           title: 'Error',
           variant: 'destructive',
-          description: 'Could not move the folder to trash',
+          description: 'Invalid file ID format',
         });
-      } else {
+        return;
+      }
+      
+      try {
+        // Update local state
+        // console.log('Dispatching file update', { 
+        //   folderId: pathId[0],
+        //   fileId: pathId[1],
+        //   workspaceId
+        // });
+        
+        dispatch({
+          type: 'UPDATE_FILE',
+          payload: {
+            file: { inTrash: `Deleted by ${user?.email}` },
+            folderId: pathId[0],
+            workspaceId,
+            fileId: pathId[1],
+          },
+        });
+        // console.log('Dispatch for file completed');
+        
+        // Update database
+        // console.log('Calling updateFile with', { 
+        //   inTrash: `Deleted by ${user?.email}`, 
+        //   fileId: pathId[1] 
+        // });
+        
+        const { data, error } = await updateFile(
+          { inTrash: `Deleted by ${user?.email}` },
+          pathId[1]
+        );
+        
+        if (error) {
+          console.error('Error moving file to trash', error);
+          toast({
+            title: 'Error',
+            variant: 'destructive',
+            description: 'Could not move the file to trash',
+          });
+        } else {
+          // console.log('File successfully moved to trash', data);
+          toast({
+            title: 'Success',
+            description: 'Moved file to trash',
+          });
+        }
+      } catch (err) {
+        console.error('Exception in file trash operation', err);
         toast({
-          title: 'Success',
-          description: 'Moved folder to trash',
+          title: 'Error',
+          variant: 'destructive',
+          description: 'An unexpected error occurred',
         });
       }
     }
   };
 
   const isFolder = listType === 'folder';
-  const groupIdentifies = clsx(
-    'dark:text-white whitespace-nowrap flex justify-between items-center w-full relative',
-    {
-      'group/folder': isFolder,
-      'group/file': !isFolder,
-    }
-  );
-
-  // Log the applied group class
-  useEffect(() => {
-    console.log(`Group class for ${id}: ${isFolder ? 'group/folder' : 'group/file'}`);
-  }, [isFolder, id]);
+  // Simplify classes
+  const actionButtonStyles = "flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white z-10";
 
   const listStyles = useMemo(
     () =>
-      clsx('relative', {
-        'border-none text-md': isFolder,
-        'border-none ml-6 text-[16px] py-1': !isFolder,
+      clsx('relative overflow-visible', {
+        'border-none text-base pl-1 pr-3': isFolder,
+        'border-none ml-4 text-base py-1 pr-3': !isFolder,
       }),
     [isFolder]
   );
 
-  const hoverStyles = useMemo(
-    () =>
-      clsx(
-<<<<<<< Updated upstream
-        'h-full hidden rounded-sm absolute right-0 items-center justify-center',
-        {
-          'group-hover/file:block': listType === 'file',
-          'group-hover/folder:block': listType === 'folder',
-=======
-        'h-full flex rounded-sm absolute right-0 items-center justify-center z-50',
-        {
-          'opacity-0 group-hover/file:opacity-100': listType === 'file' && !isAccordionOpen,
-          'hidden group-hover/folder:flex': listType === 'folder' && !isAccordionOpen,
->>>>>>> Stashed changes
-        }
-      ),
-    [isFolder, listType, isAccordionOpen]
-  );
-
-  // Log the computed hover styles
-  useEffect(() => {
-    console.log(`Hover styles for ${id}: ${hoverStyles}`);
-  }, [hoverStyles, id]);
-
-  // Add debugging for event bubbling when accordion is expanded
-  useEffect(() => {
-    if (isAccordionOpen && listType === 'folder') {
-      console.log(`Folder ${id} is expanded - checking hover functionality`);
-      
-      // Check if any parent elements might be blocking hover events
-      const checkParentElements = () => {
-        if (!itemRef.current) return;
-        
-        let currentEl: HTMLElement | null = itemRef.current;
-        let depth = 0;
-        const parentInfo = [];
-        
-        while (currentEl && depth < 5) {
-          const styles = window.getComputedStyle(currentEl);
-          parentInfo.push({
-            tag: currentEl.tagName,
-            classes: currentEl.className,
-            position: styles.position,
-            zIndex: styles.zIndex,
-            overflow: styles.overflow,
-            pointerEvents: styles.pointerEvents
-          });
-          currentEl = currentEl.parentElement;
-          depth++;
-        }
-        
-        console.log(`Element hierarchy for ${id}:`, parentInfo);
-      };
-      
-      checkParentElements();
-    }
-  }, [isAccordionOpen, id, listType]);
-  
-  // Debug hover detection issues
-  const [hoverDetectionIssue, setHoverDetectionIssue] = useState(false);
-  
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    
-    if (isHovering) {
-      // Check if hover styles are actually applied
-      const checkHoverStylesApplied = () => {
-        if (!itemRef.current) return;
-        
-        // Get the icons container - should be the last child of the itemRef element
-        const iconsContainer = Array.from(itemRef.current.children).pop() as HTMLElement;
-        
-        if (iconsContainer) {
-          const styles = window.getComputedStyle(iconsContainer);
-          const isVisible = styles.display !== 'none' && styles.opacity !== '0';
-          
-          console.log(`Icons container for ${id} visible:`, isVisible, {
-            display: styles.display,
-            opacity: styles.opacity,
-            visibility: styles.visibility
-          });
-          
-          if (!isVisible && isHovering) {
-            setHoverDetectionIssue(true);
-            console.warn(`Hover detection issue for ${id}: element is being hovered but styles aren't applied`);
-          } else {
-            setHoverDetectionIssue(false);
-          }
-        }
-      };
-      
-      // Wait a short time to check if hover styles were applied
-      timeout = setTimeout(checkHoverStylesApplied, 100);
-    }
-    
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [isHovering, id]);
-  
-  // Log when hover detection issues occur
-  useEffect(() => {
-    if (hoverDetectionIssue) {
-      console.warn(`[${id}] Hover detection issue: hover state is true but hover styles aren't visible`);
-    }
-  }, [hoverDetectionIssue, id]);
-  
   const addNewFile = async () => {
     if (!workspaceId) return;
+    
+    // Ensure accordion is expanded to see the new file
+    setIsAccordionOpen(true);
+    
+    // Generate a unique ID for the new file
+    const fileId = v4();
+    
     const newFile: File = {
       folderId: id,
       data: null,
@@ -409,31 +516,62 @@ const Dropdown: React.FC<DropdownProps> = ({
       inTrash: null,
       title: 'Untitled',
       iconId: '📄',
-      id: v4(),
+      id: fileId,
       workspaceId,
       bannerUrl: '',
     };
+    
+    // Update local state first for immediate UI feedback
     dispatch({
       type: 'ADD_FILE',
       payload: { file: newFile, folderId: id, workspaceId },
     });
-    const { data, error } = await createFile(newFile);
-    if (error) {
+    
+    // console.log("Created new file locally:", { fileId, folderId: id });
+
+    // Then create in database
+    try {
+      const { data, error } = await createFile(newFile);
+      
+      if (error) {
+        console.error("Error creating file:", error);
+        toast({
+          title: 'Error',
+          variant: 'destructive',
+          description: 'Could not create a file',
+        });
+        
+        // Rollback UI change if server update failed
+        dispatch({
+          type: 'DELETE_FILE',
+          payload: { 
+            fileId: newFile.id,
+            folderId: id,
+            workspaceId
+          }
+        });
+      } else {
+        // console.log("File created successfully:", data);
+        toast({
+          title: 'Success',
+          description: 'File created.',
+        });
+        
+        // Force accordion to remain open after file creation
+        setTimeout(() => {
+          setIsAccordionOpen(true);
+        }, 100);
+      }
+    } catch (err) {
+      console.error("Exception creating file:", err);
       toast({
         title: 'Error',
         variant: 'destructive',
-        description: 'Could not create a file',
-      });
-    } else {
-      toast({
-        title: 'Success',
-        description: 'File created.',
+        description: 'Could not create the file',
       });
     }
   };
 
-<<<<<<< Updated upstream
-=======
   // Track when a new file is added to prevent immediate refresh
   const [recentlyAddedFile, setRecentlyAddedFile] = useState(false);
   
@@ -462,7 +600,7 @@ const Dropdown: React.FC<DropdownProps> = ({
   useEffect(() => {
     if (isAccordionOpen && listType === 'folder' && id && workspaceId && !recentlyAddedFile) {
       const fetchFolderFiles = async () => {
-        console.log('Fetching files for folder:', id);
+        // console.log('Fetching files for folder:', id);
         try {
           const { data, error } = await getFiles(id);
           if (error) {
@@ -471,7 +609,7 @@ const Dropdown: React.FC<DropdownProps> = ({
           }
           
           if (data && data.length > 0) {
-            console.log('Files found:', data.length);
+            // console.log('Files found:', data.length);
             
             // Check if we already have files in local state
             const existingFiles = state.workspaces
@@ -488,7 +626,7 @@ const Dropdown: React.FC<DropdownProps> = ({
               });
             }
           } else {
-            console.log('No files found for folder');
+            // console.log('No files found for folder');
           }
         } catch (err) {
           console.error('Exception fetching files:', err);
@@ -499,311 +637,139 @@ const Dropdown: React.FC<DropdownProps> = ({
     }
   }, [isAccordionOpen, listType, id, workspaceId, dispatch, recentlyAddedFile, state.workspaces]);
 
-  // Track accordion expansion effect on hover classes
-  useEffect(() => {
-    if (itemRef.current && isAccordionOpen && listType === 'folder') {
-      // Find all child file items after expansion
-      setTimeout(() => {
-        console.log(`Checking child elements after accordion expansion for ${id}`);
-        
-        // Check the AccordionContent structure
-        const accordionContentEl = itemRef.current?.closest('.accordion-item')?.querySelector('[data-state="open"]');
-        
-        if (accordionContentEl) {
-          console.log('Accordion content element found:', {
-            tag: accordionContentEl.tagName,
-            classes: accordionContentEl.className,
-            dataState: accordionContentEl.getAttribute('data-state'),
-            childrenCount: accordionContentEl.childNodes.length
-          });
-          
-          // Try to find file items within the content
-          const fileItems = accordionContentEl.querySelectorAll('[id="file"]');
-          console.log(`Found ${fileItems.length} file items in expanded content`);
-          
-          // Check stacking context
-          const styles = window.getComputedStyle(accordionContentEl);
-          console.log('Accordion content styles:', {
-            position: styles.position,
-            zIndex: styles.zIndex,
-            overflow: styles.overflow,
-            transform: styles.transform,
-            isolation: styles.isolation
-          });
-          
-          // Check for any elements that might block the hover
-          type BlockingElement = {
-            tag: string;
-            classes: string;
-            position: string;
-            zIndex: string;
-            pointerEvents: string;
-          };
-          
-          const blockingElements: BlockingElement[] = [];
-          Array.from(accordionContentEl.children).forEach(child => {
-            const childStyles = window.getComputedStyle(child as Element);
-            if (childStyles.position === 'absolute' || childStyles.position === 'fixed' || 
-                parseInt(childStyles.zIndex, 10) > 0 || childStyles.pointerEvents === 'none') {
-              blockingElements.push({
-                tag: (child as Element).tagName,
-                classes: (child as Element).className,
-                position: childStyles.position,
-                zIndex: childStyles.zIndex,
-                pointerEvents: childStyles.pointerEvents
-              });
-            }
-          });
-          
-          if (blockingElements.length) {
-            console.log('Potential blocking elements found:', blockingElements);
-          }
-        } else {
-          console.log('No accordion content element found after expansion');
-        }
-      }, 100); // Short delay to let the DOM update
-    }
-  }, [isAccordionOpen, id, listType]);
-
->>>>>>> Stashed changes
   return (
     <AccordionItem
       value={id}
       className={listStyles}
-      onClick={(e) => {
-        e.stopPropagation();
-        navigatatePage(id, listType);
+      onClick={async (e) => {
+        // Log what element was actually clicked with proper type casting
+        // console.log(`AccordionItem clicked: target=${(e.target as Element).tagName || 'unknown'}, currentTarget=${(e.currentTarget as Element).tagName || 'unknown'}`);
+        
+        // Only navigate if it's a direct click on the item, not on a child element
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+          // console.log(`Direct click on AccordionItem: navigating ${listType} with id=${id}`);
+          
+          // For folder items, only navigate when clicking on the item itself
+          if (listType === 'folder') {
+            await navigatePage(id, listType);
+          }
+        }
       }}
     >
       <AccordionTrigger
         id={listType}
         className="hover:no-underline 
-        p-2 
+        px-1 
+        py-1
         dark:text-muted-foreground 
         text-sm"
-        disabled={listType === 'file'}
+        disabled={false}
+        onFocus={() => listType === 'folder' && setIsAccordionOpen(true)}
+        onClick={async (e) => {
+          // console.log(`AccordionTrigger clicked for ${listType}`, { id });
+          
+          // Stop propagation for both folder and file clicks
+          e.stopPropagation();
+          
+          // For folders, only toggle the accordion, don't navigate yet
+          if (listType === 'folder') {
+            setIsAccordionOpen(prev => !prev);
+          } 
+          // For files, navigate to the file
+          else if (listType === 'file') {
+            await navigatePage(id, listType);
+          }
+        }}
+        showArrow={listType === 'folder'}
       >
-<<<<<<< Updated upstream
-        <div className={groupIdentifies}>
-          <div
-            className="flex 
-          gap-4 
-          items-center 
-          justify-center 
-          overflow-hidden"
-          >
-            <div className="relative">
-              <EmojiPicker getValue={onChangeEmoji}>{iconId}</EmojiPicker>
-            </div>
-            <input
-                title={listType === 'folder' ? 'Folder Title' : 'File Title'}
-                placeholder={listType === 'folder' ? 'Enter folder title' : 'Enter file title'}
-              type="text"
-              value={listType === 'folder' ? folderTitle : fileTitle}
-              className={clsx(
-                'outline-none overflow-hidden w-[140px] text-Neutrals/neutrals-7',
-                {
-                  'bg-muted cursor-text': isEditing,
-                  'bg-transparent cursor-pointer': !isEditing,
-                }
-              )}
-              readOnly={!isEditing}
-              onDoubleClick={handleDoubleClick}
-              onBlur={handleBlur}
-              onChange={
-                listType === 'folder' ? folderTitleChange : fileTitleChange
-              }
-            />
-          </div>
-          <div className={hoverStyles}>
-            <TooltipWrapper tooltip="Delete Folder">
-              <Trash
-                onClick={moveToTrash}
-                size={15}
-                className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
-              />
-            </TooltipWrapper>
-            {listType === 'folder' && !isEditing && (
-              <TooltipWrapper tooltip="Add File">
-                <PlusIcon
-                  onClick={addNewFile}
-                  size={15}
-                  className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
-                />
-=======
-        <div 
-          className={groupIdentifies}
-          ref={itemRef}
-          onMouseEnter={() => {
-            console.log(`Mouse enter on ${listType} ${id}`);
-            setIsHovering(true);
-          }}
-          onMouseLeave={() => {
-            console.log(`Mouse leave on ${listType} ${id}`);
-            setIsHovering(false);
-          }}
-        >
-          <div className="flex gap-2 items-center">
+        <div className="flex w-full justify-between items-center group">
+          <div className="flex items-center gap-2 max-w-[220px] truncate">
+            <EmojiPicker getValue={onChangeEmoji}>
+              <span className={`flex items-center justify-center flex-shrink-0 ${listType === 'folder' ? 'w-[26px] h-[26px] text-lg' : 'w-[18px] h-[18px] text-sm'}`}>
+                {iconId}
+              </span>
+            </EmojiPicker>
+            
             {!isEditing ? (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <EmojiPicker getValue={onChangeEmoji}>
-                    <span className="w-[24px] h-[24px] flex items-center justify-center">
-                      {iconId}
-                    </span>
-                  </EmojiPicker>
-                  <span 
-                    className="text-sm cursor-pointer truncate max-w-[150px]"
-                    onDoubleClick={handleDoubleClick}
-                    title={folderTitle || fileTitle}
-                  >
-                    {folderTitle || fileTitle}
-                  </span>
-                </div>
-              </div>
+              <span 
+                className="text-base cursor-pointer truncate"
+                onDoubleClick={handleDoubleClick}
+              >
+                {folderTitle || fileTitle}
+              </span>
             ) : (
-              <div className="flex items-center gap-2">
-                <EmojiPicker getValue={onChangeEmoji}>
-                  <span className="w-[24px] h-[24px] flex items-center justify-center">
-                    {iconId}
-                  </span>
-                </EmojiPicker>
-                <input
-                  type="text"
-                  value={folderTitle || fileTitle}
-                  onChange={(e) => {
-                    if (listType === 'folder') {
-                      folderTitleChange(e);
-                    } else {
-                      fileTitleChange(e);
-                    }
-                  }}
-                  onBlur={handleBlur}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleBlur();
-                    }
-                  }}
-                  autoFocus
-                  className="bg-transparent text-sm border-none focus:outline-none max-w-[150px]"
-                  aria-label={`Edit ${listType} title`}
-                />
-              </div>
-            )}
-          </div>
-          <div 
-            className={hoverStyles}
-            style={{
-              // Always use inline styles to control visibility based on hover state
-              display: isHovering ? 'flex' : listType === 'folder' ? 'none' : undefined,
-              opacity: isHovering ? 1 : listType === 'file' ? 0 : undefined,
-              zIndex: 50,
-              position: 'absolute',
-              right: '0.5rem',
-            }}
-            onClick={(e) => {
-              console.log(`Icons container clicked for ${id}, visible=${isHovering}`);
-              e.stopPropagation();
-            }}
-          >
-            <TooltipWrapper tooltip="Delete">
-              <span
-                className="p-1 hover:bg-slate-600 rounded-full transition-colors inline-flex"
-                onClick={(e) => {
-                  console.log(`Delete icon clicked for ${id}`);
-                  e.stopPropagation();
-                  if (listType === 'file') {
-                    const pathId = id.split('folder')[1];
-                    if (pathId) {
-                      try {
-                        console.log('🔍 Moving file to trash:', { pathId });
-                        moveToTrash(e);
-                      } catch (err) {
-                        console.error('🔍 Exception in file trash operation:', err);
-                        toast({
-                          title: 'Error',
-                          variant: 'destructive',
-                          description: 'An unexpected error occurred',
-                        });
-                      }
-                    } else {
-                      console.error('🔍 Invalid file ID format:', { pathId, id });
-                      toast({
-                        title: 'Error',
-                        variant: 'destructive',
-                        description: 'Could not identify file to delete',
-                      });
-                    }
+              <input
+                type="text"
+                value={folderTitle || fileTitle}
+                onChange={(e) => {
+                  if (listType === 'folder') {
+                    folderTitleChange(e);
                   } else {
-                    // Folder deletion logic - use existing moveToTrash function
-                    console.log('🔍 Deleting folder:', { id });
-                    moveToTrash(e);
+                    fileTitleChange(e);
                   }
                 }}
-              >
-                <Trash
-                  size={15}
-                  className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
-                />
-              </span>
-            </TooltipWrapper>
+                onBlur={handleBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleBlur();
+                  }
+                }}
+                autoFocus
+                className="bg-transparent text-base border-none focus:outline-none w-full"
+                aria-label={`Edit ${listType} title`}
+              />
+            )}
+          </div>
+
+          {/* Action buttons with smooth fade-in animation */}
+          <div className="flex items-center gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out ml-1">
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                moveToTrash(e);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  moveToTrash(e as unknown as React.MouseEvent);
+                }
+              }}
+              title="Delete"
+            >
+              <Trash size={14} />
+            </div>
+            
             {listType === 'folder' && !isEditing && (
-              <TooltipWrapper tooltip="Add File">
-                <span
-                  onClick={(e) => {
-                    console.log(`Add file icon clicked for ${id}`);
+              <div
+                role="button"
+                tabIndex={0}
+                className="flex items-center justify-center rounded-full hover:bg-slate-700 w-6 h-6 text-white cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addNewFile();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
                     e.stopPropagation();
                     addNewFile();
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  className="inline-flex"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      addNewFile();
-                    }
-                  }}
-                >
-                  <PlusIcon
-                    size={15}
-                    className="hover:dark:text-white dark:text-Neutrals/neutrals-7 transition-colors"
-                  />
-                </span>
->>>>>>> Stashed changes
-              </TooltipWrapper>
+                  }
+                }}
+                title="Add File"
+              >
+                <PlusIcon size={14} />
+              </div>
             )}
           </div>
         </div>
       </AccordionTrigger>
-<<<<<<< Updated upstream
-      <AccordionContent>
-        {state.workspaces
-          .find((workspace) => workspace.id === workspaceId)
-          ?.folders.find((folder) => folder.id === id)
-          ?.files.filter((file) => !file.inTrash)
-          .map((file) => {
-            const customFileId = `${id}folder${file.id}`;
-            return (
-              <Dropdown
-                key={file.id}
-                title={file.title}
-                listType="file"
-                id={customFileId}
-                iconId={file.iconId}
-              />
-            );
-          })}
-      </AccordionContent>
-=======
-      
-      {/* Add debug code to log when rendering AccordionContent */}
-      {listType === 'folder' && (
-        <AccordionContent 
-          className="relative" // Ensure proper positioning context
-          onAnimationStart={() => console.log(`Accordion animation started for ${id}`)}
-          onAnimationEnd={() => console.log(`Accordion animation completed for ${id}`)}
-        >
+      {listType === 'folder' ? (
+        <AccordionContent>
           {state.workspaces
             .find((workspace) => workspace.id === workspaceId)
             ?.folders.find((folder) => folder.id === id)
@@ -811,7 +777,7 @@ const Dropdown: React.FC<DropdownProps> = ({
             .map((file) => {
               // Create the composite ID properly to include the parent folder ID
               const customFileId = `${id}folder${file.id}`;
-              console.log(`Rendering file ${file.id} with customFileId=${customFileId}`);
+              // console.log(`Rendering file ${file.id} with customFileId=${customFileId}`);
               return (
                 <Dropdown
                   key={file.id}
@@ -823,8 +789,7 @@ const Dropdown: React.FC<DropdownProps> = ({
               );
             })}
         </AccordionContent>
-      )}
->>>>>>> Stashed changes
+      ) : null}
     </AccordionItem>
   );
 };

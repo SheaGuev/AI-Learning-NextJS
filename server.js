@@ -37,13 +37,10 @@ app.prepare().then(() => {
     socket.on('create-room', (roomId) => {
       console.log(`Socket ${socket.id} joining room: ${roomId}`);
       socket.join(roomId);
-      // Notify the client of successful room join
-      socket.emit('room-joined', roomId);
     });
 
     socket.on('send-changes', (delta, roomId) => {
       console.log(`Changes received from ${socket.id} for room ${roomId}`);
-      // Ensure the sender is not receiving their own changes
       socket.to(roomId).emit('receive-changes', delta, roomId);
     });
 
@@ -54,7 +51,6 @@ app.prepare().then(() => {
 
     socket.on('disconnect', (reason) => {
       console.log(`Socket ${socket.id} disconnected: ${reason}`);
-      // You could potentially track cursor removal here
     });
   });
 

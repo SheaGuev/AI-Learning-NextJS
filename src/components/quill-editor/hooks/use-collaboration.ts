@@ -4,9 +4,11 @@ import { useSocket } from '@/lib/providers/socket-provider';
 import { findUser } from '@/supabase/queries';
 import { createBClient } from '@/lib/server-actions/createClient';
 import { Collaborator } from '../types';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 
 export const useCollaboration = (quill: any, fileId: string) => {
+  console.log('=== COLLABORATION HOOK INITIALIZED ===', { fileId, quillExists: !!quill });
+  
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [localCursors, setLocalCursors] = useState<any>([]);
   const { socket, isConnected } = useSocket();
@@ -54,8 +56,12 @@ export const useCollaboration = (quill: any, fileId: string) => {
   useEffect(() => {
     if (!quill || !socket || !fileId) return;
     
+    console.log(`[Collaboration] Setting up 'receive-changes' listener for file: ${fileId}, Socket ID: ${socket.id} (PRIMARY HANDLER)`);
+
     const socketHandler = (deltas: any, id: string) => {
+      console.log(`[Collaboration] Received 'receive-changes' event for file: ${id}. Current fileId: ${fileId}`);
       if (id === fileId) {
+        console.log('[Collaboration] Applying deltas to editor (PRIMARY HANDLER):', deltas);
         quill.updateContents(deltas);
       }
     };
@@ -63,6 +69,7 @@ export const useCollaboration = (quill: any, fileId: string) => {
     socket.on('receive-changes', socketHandler);
     
     return () => {
+      console.log(`[Collaboration] Cleaning up 'receive-changes' listener for file: ${fileId}, Socket ID: ${socket.id}`);
       socket.off('receive-changes', socketHandler);
     };
   }, [quill, socket, fileId]);

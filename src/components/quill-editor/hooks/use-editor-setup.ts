@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
+// import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import { TOOLBAR_OPTIONS } from '../types';
 import SlashCommands from '../extensions/slash-commands';
-import { registerCustomBlocks } from '../extensions/custom-blocks';
+import * as CustomBlocks from '../extensions/blocks/custom-blocks';
+// import { registerFlashcardBlot } from '../extensions/flashcard-blot';
 import '../styles/slash-commands.css';
 import '../styles/checkbox.css';
 import '../styles/flashcard.css';
 import '../styles/quiz.css';
-import { initializeCheckboxes } from '../extensions/checkbox-blot';
+import '../styles/markdown-table.css';
+// import QuillMarkdown from 'quilljs-markdown';
+import MarkdownTable, { registerMarkdownTable } from '../extensions/formats/markdown-table';
 
 // SVG icons for our menu
 const ICONS = {
@@ -21,7 +25,7 @@ const ICONS = {
   callout: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lightbulb"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
   table: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-table"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
   checkbox: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-square"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>`,
-  aiGenerate: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>`,
+  aiGenerate: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1-1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>`,
   flashcard: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square-stack"><path d="M4 10c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2"></path><path d="M10 16c-1.1 0-2-.9-2-2v-4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2"></path><rect width="8" height="8" x="14" y="14" rx="2"></rect></svg>`,
   quiz: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-checks"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>`,
 };
@@ -59,8 +63,14 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
           // Register slash commands module
           Quill.register('modules/slashCommands', SlashCommands);
           
-          // Register custom blocks
-          registerCustomBlocks(Quill);
+          // Register custom blocks using the namespace
+          CustomBlocks.registerCustomBlocks(Quill);
+          
+          // Register markdown table module and get the blot for reference
+          const TableBlot = registerMarkdownTable(Quill);
+          Quill.register('modules/markdownTable', MarkdownTable);
+          // Also register the TableBlot directly with Quill to make sure it's available
+          Quill.register(TableBlot);
           
           console.log('All modules registered successfully');
           
@@ -461,20 +471,80 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
                       const index = range.index;
                       
                       try {
-                        // Insert the checkbox
-                        quill.insertEmbed(index, 'checkbox', false, 'user');
+                        // Use Quill's built-in list format for checkboxes
+                        // Ensure we are at the start of a line or insert a newline
+                        const [line, offset] = quill.getLine(index);
+                        if (offset > 0) {
+                          quill.insertText(index, '\n', 'user');
+                          // Format the *new* line as a checkbox list item
+                          quill.formatLine(index + 1, 1, 'list', 'unchecked', 'user');
+                          // Move cursor to the beginning of the formatted line
+                          quill.setSelection(index + 1, 0, 'silent');
+                        } else {
+                          // Format the current line as a checkbox list item
+                          quill.formatLine(index, 1, 'list', 'unchecked', 'user');
+                          // Cursor should already be at the start or handled by formatLine
+                          quill.setSelection(index, 0, 'silent'); 
+                        }
                         
-                        // Set selection right after the checkbox
-                        quill.setSelection(index + 1, 0, 'silent');
-                        
-                        console.log('Checkbox inserted successfully at position', index);
+                        console.log('Checkbox list item created successfully at index', index);
                       } catch (error) {
-                        console.error('Error inserting checkbox:', error);
+                        console.error('Error creating checkbox list item:', error);
+                      }
+                    }
+                  },
+                  {
+                    label: 'Table',
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-table"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>`,
+                    description: 'Insert a table',
+                    handler: (quill: any, range: any) => {
+                      // Insert a simple 2x2 table template
+                      const tableTemplate = `
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+| Cell 3   | Cell 4   |
+`;
+                      
+                      // Insert a newline first if not at the beginning of a line
+                      const currentPosition = range.index;
+                      const currentText = quill.getText(currentPosition - 1, 1);
+                      
+                      if (currentPosition > 0 && currentText !== '\n') {
+                        quill.insertText(currentPosition, '\n', 'user');
+                        quill.insertText(currentPosition + 1, tableTemplate, 'user');
+                        quill.setSelection(currentPosition + tableTemplate.length + 1, 0);
+                      } else {
+                        quill.insertText(currentPosition, tableTemplate, 'user');
+                        quill.setSelection(currentPosition + tableTemplate.length, 0);
+                      }
+                      
+                      // Process the markdown
+                      try {
+                        const markdownModule = quill.getModule('markdown');
+                        if (markdownModule && typeof markdownModule.process === 'function') {
+                          setTimeout(() => {
+                            markdownModule.process();
+                          }, 100);
+                        }
+                        
+                        // Also process tables
+                        const tableModule = quill.getModule('markdownTable');
+                        if (tableModule && typeof tableModule.detectAndRenderTables === 'function') {
+                          setTimeout(() => {
+                            tableModule.detectAndRenderTables();
+                          }, 200);
+                        }
+                      } catch (err) {
+                        console.error('Error processing markdown for table:', err);
                       }
                     }
                   },
                 ]
-              }
+              },
+              // Add markdown table support
+              markdownTable: {},
+              markdown: false
             },
             placeholder: 'Start writing or type "/" for commands...',
             formats: [
@@ -482,20 +552,50 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
               'header', 'list', 'blockquote', 'code-block', 
               'hr', 'callout', 'script', 'indent', 'direction', 
               'size', 'color', 'background', 'font', 'align',
-              'checkbox', 'flashcard', 'quiz'  // Add quiz to allowed formats
+              'checkbox', 'flashcard', 'quiz', 'markdown-table'  // Add markdown-table to allowed formats
             ],
           });
           
+          // RE-ADD Initialization of external quilljs-markdown library
           // Initialize markdown support
           const markdownOptions = {
             ignoreTags: ['pre', 'strikethrough'],
             matchVisual: false,
+            // Add support for tables and better list handling
+            tables: true,
+            breaks: true,
+            indentedCodeBlock: true,
+            linkify: true,
+            typographer: true
           };
           
-          new QuillMarkdown(q, markdownOptions);
+          // Create and initialize the markdown module
+          const markdownModule = new QuillMarkdown(q, markdownOptions);
+          
+          // Store module reference in Quill instance for easy access
+          (q as any).markdownModule = markdownModule;
+          
+          // Force an initial markdown processing pass when content is loaded
+          q.on('editor-change', (eventName: string) => {
+            if (eventName === 'text-change') {
+              // Debounce to avoid excessive processing
+              clearTimeout((q as any).markdownTimeout);
+              (q as any).markdownTimeout = setTimeout(() => {
+                try {
+                  // Check if the module instance still exists
+                  const currentMarkdownModule = (q as any).markdownModule;
+                  if (currentMarkdownModule && typeof currentMarkdownModule.process === 'function') {
+                    console.log('Processing markdown via editor-change listener...');
+                    currentMarkdownModule.process();
+                  }
+                } catch (err) {
+                  console.error('Error in markdown processing listener:', err);
+                }
+              }, 200); // Adjusted debounce time slightly
+            }
+          });
           
           // Initialize checkbox support
-          initializeCheckboxes(q);
           
           // Add custom handler for markdown-style checkboxes
           q.keyboard.addBinding({
@@ -738,4 +838,4 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
   }, [wrapperRef]);
   
   return { quill };
-}; 
+};

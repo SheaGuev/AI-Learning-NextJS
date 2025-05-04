@@ -7,10 +7,9 @@ import { redirect } from 'next/navigation';
 import DashboardSetup from '@/components/dashboard-setup/dashboard-setup';
 import { getUserSubscriptionStatus } from '../../../supabase/queries';
 import AppStateProvider from '../../../lib/providers/state-provider';
-
-
-
-
+import AiTutor from '@/components/dashboard-tools/ai-tutor/ai-tutor';
+import { workspaces } from '@/supabase/schema';
+import { eq } from 'drizzle-orm';
 
 const DashboardPage = async () => {
   console.log("retrieving data...")
@@ -26,9 +25,7 @@ const DashboardPage = async () => {
 
   if (!user) return (console.error('No user found'));
 
-  const workspace = await db.query.workspaces.findFirst({
-    where: (workspace, { eq }) => eq(workspace.workspaceOwner, user.id),
-  });
+  const [workspace] = await db.select().from(workspaces).where(eq(workspaces.workspaceOwner, user.id)).limit(1).execute();
 
   const { data: subscription, error: subscriptionError } =
     await getUserSubscriptionStatus(user.id);
@@ -60,6 +57,9 @@ const DashboardPage = async () => {
       </div>
     );
     // redirect(`/dashboard/${workspace.id}`);
+
+  // If workspace exists, show dashboard with AI Tutor
+  
 };
 
 export default DashboardPage;

@@ -1,9 +1,6 @@
 import Link from 'next/link';
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
-// import CypressHomeIcon from '../icons/cypressHomeIcon';
-// import CypressSettingsIcon from '../icons/cypressSettingsIcon';
-// import CypressTrashIcon from '../icons/cypressTrashIcon';
 import Settings from '../settings/settings';
 import Trash from '../trash/trash';
 
@@ -23,19 +20,22 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
 }) => {
   return (
     <nav className={twMerge('my-2', className)}>
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-3">
         <li>
           <Link
             className="group/native
             flex
-            text-Neutrals/neutrals-7
+            items-center
+            text-neutral-100
+            text-Neutrals/neutrals-9
+            hover:text-white
             transition-all
-            gap-2
+            gap-3
           "
             href={`/dashboard/${myWorkspaceId}`}
           >
-            <FiHome />
-            <span>My Workspace</span>
+            <FiHome className="h-6 w-6" />
+            <span className="text-lg">Dashboard</span>
           </Link>
         </li>
 
@@ -43,14 +43,16 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
           <li
             className="group/native
             flex
-            text-Neutrals/neutrals-7
+            items-center
+             text-neutral-100
+            hover:text-white
             transition-all
-            gap-2
+            gap-3
             cursor-pointer
           "
           >
-            <FiSettings />
-            <span>Settings</span>
+            <FiSettings className="h-6 w-6" />
+            <span className="text-lg">Settings</span>
           </li>
         </Settings>
 
@@ -58,18 +60,23 @@ const NativeNavigation: React.FC<NativeNavigationProps> = ({
           <li
             className="group/native
             flex
-            text-Neutrals/neutrals-7
+            items-center
+            text-neutral-100
+            hover:text-white
             transition-all
-            gap-2
+            gap-3
           "
           >
-            <FiTrash2 />
-            <span>Trash</span>
+            <FiTrash2 className="h-6 w-6" />
+            <span className="text-lg">Trash</span>
           </li>
         </Trash>
       </ul>
     </nav>
   );
 };
+
+// text-Neutrals/neutrals-9
+//             hover:text-Neutrals/neutrals-3
 
 export default NativeNavigation;
