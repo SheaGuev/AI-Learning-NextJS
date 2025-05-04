@@ -3,10 +3,14 @@ import { useRouter } from 'next/navigation';
 import { useAppState } from '@/lib/providers/state-provider';
 import { getFileDetails, getFolderDetails, getWorkspaceDetails } from '@/supabase/queries';
 
+// Define the type for the importMarkdown function
+type ImportMarkdownType = (markdown: string) => void;
+
 export const useContentLoader = (
   quill: any, 
   fileId: string, 
-  dirType: 'file' | 'folder' | 'workspace'
+  dirType: 'file' | 'folder' | 'workspace',
+  importMarkdown: ImportMarkdownType // Add importMarkdown as an argument
 ) => {
   const router = useRouter();
   const { workspaceId, folderId, dispatch } = useAppState();
@@ -37,8 +41,9 @@ export const useContentLoader = (
             const parsedData = JSON.parse(selectedDir[0].data);
             const markdownContent = parsedData.content || '';
             console.log('Loading raw markdown content into Quill...');
-            quill.setText(markdownContent); // Just set the raw text
+            // quill.setText(markdownContent); // Just set the raw text
             // Let the quilljs-markdown listener handle processing
+            importMarkdown(markdownContent); // Explicitly call importMarkdown
           } catch (e) {
             console.error('Error parsing markdown data object, falling back to setting raw text:', e);
             quill.setText(selectedDir[0].data); // Fallback to raw data string
@@ -85,6 +90,7 @@ export const useContentLoader = (
         if (parsedData.markdown && parsedData.content) {
           // Use the shared processing function
           // processMarkdownContent(quill, parsedData.content);
+          importMarkdown(parsedData.content); // Call importMarkdown here too
         } else {
           // Normal Quill delta content
           quill.setContents(parsedData);
@@ -115,6 +121,7 @@ export const useContentLoader = (
         if (parsedData.markdown && parsedData.content) {
           // Use the shared processing function
           // processMarkdownContent(quill, parsedData.content);
+          importMarkdown(parsedData.content); // And here for workspace loading
         } else {
           // Normal Quill delta content
           quill.setContents(parsedData);
@@ -131,5 +138,5 @@ export const useContentLoader = (
     };
     
     fetchInformation();
-  }, [fileId, workspaceId, quill, dirType, dispatch, folderId, router]);
+  }, [fileId, workspaceId, quill, dirType, dispatch, folderId, router, importMarkdown]); // Add importMarkdown to dependency array
 }; 

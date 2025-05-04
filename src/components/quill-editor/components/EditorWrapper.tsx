@@ -78,7 +78,7 @@ const EditorWrapper: React.FC<QuillEditorProps> = ({
   useKeyboardHandlers(quill);
   
   // Load content
-  useContentLoader(quill, fileId, dirType);
+  useContentLoader(quill, fileId, dirType, importMarkdown);
   
   // Set up automatic saving with text-change handler
   useEffect(() => {
