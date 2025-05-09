@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RiPlayLine, RiPauseLine, RiRestartLine, RiSkipForwardLine } from 'react-icons/ri';
 
 // Helper function to format time (MM:SS)
-const formatTime = (seconds: number): string => {
+export const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
