@@ -9,6 +9,7 @@ declare module 'turndown' {
     strongDelimiter?: string;
     linkStyle?: 'inlined' | 'referenced';
     linkReferenceStyle?: 'full' | 'collapsed' | 'shortcut';
+    listIndent?: string;
   }
 
   class TurndownService {

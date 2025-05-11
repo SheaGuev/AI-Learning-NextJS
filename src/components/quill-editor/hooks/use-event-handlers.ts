@@ -1,24 +1,11 @@
 import { useCallback, useEffect } from 'react';
 import { useToast } from '@/lib/hooks/use-toast';
 import { usePDFProcessor } from './use-pdf-processor';
+import { MARKDOWN_FORMATTING_INSTRUCTIONS } from '@/lib/utils/markdown-constants';
+import { aiMarkdownToDelta, QuillOp } from '../lib/utils/delta-utils';
 
-// Centralized Markdown Formatting Instructions
-export const MARKDOWN_FORMATTING_INSTRUCTIONS = `
-Format your response using proper Markdown syntax following these guidelines:
-1. Use proper paragraph breaks with a blank line between paragraphs
-2. For bullet lists, use * with a space after it, and place each item on a new line
-3. For numbered lists, use 1. 2. 3. with a space after the period
-4. For nested lists, indent with 1 space (not tabs) before the * or number
-5. For code blocks, use triple backticks (\`\`\`) on separate lines before and after the code
-6. For inline code, surround with single backticks (\`)
-7. For headings, use # with a space after it (## for heading 2, ### for heading 3)
-8. For emphasis, use *italic* or **bold** without spaces between the asterisks and text
-9. For blockquotes, use > with a space after it at the start of each line
-10. For tables, follow this format:
-| Column 1 | Column 2 |
-| -------- | -------- |
-| cell 1   | cell 2   |
-`;
+// Export the imported constant for backward compatibility
+export { MARKDOWN_FORMATTING_INSTRUCTIONS };
 
 export const useEventHandlers = (
   quill: any,
@@ -36,19 +23,20 @@ export const useEventHandlers = (
 
   // Handle AI generation for text
   const handleAIGenerate = useCallback(async (prompt: string, length: string, pdfText?: string) => {
+    console.log('>>> handleAIGenerate CALLED. Prompt:', prompt, 'Length:', length, 'Has PDF Text:', !!pdfText);
+
     console.log('handleAIGenerate called with:', { promptLength: prompt.length, length, hasPdfText: !!pdfText });
     
-    if (!quill) {
-      console.error('handleAIGenerate error: Quill editor is not initialized');
-      throw new Error('Editor not initialized');
+    if (!quill || !Delta) { // Ensure Delta is also available
+      console.error('handleAIGenerate error: Quill editor or Delta is not initialized');
+      throw new Error('Editor or Delta not initialized');
     }
     
     // Try to get the current selection or set a default one
-    let currentRange;
-    const selection = quill.getSelection();
+    let currentRange = quill.getSelection(); // Can be null
     
-    if (!selection) {
-      console.log('No active selection found, setting default selection at the beginning');
+    if (!currentRange) {
+      console.log('No active selection found, attempting to set selection at the beginning');
       // If no selection, set a default selection at the beginning
       try {
         quill.focus(); // Try to focus the editor first
@@ -57,20 +45,17 @@ export const useEventHandlers = (
         await new Promise(resolve => setTimeout(resolve, 10));
         currentRange = quill.getSelection() || { index: 0, length: 0 };
       } catch (err) {
-        console.log('Could not set selection, using default index 0', err);
-        currentRange = { index: 0, length: 0 };
+        console.warn('Could not set selection, defaulting to index 0', err);
+        currentRange = { index: 0, length: 0 }; // Fallback if focus/setSelection fails
       }
-    } else {
-      currentRange = selection;
     }
-    
-    console.log('Using selection at index:', currentRange.index);
+    console.log('Using selection at index:', currentRange.index, 'length:', currentRange.length);
     
     try {
       // Get some context from before the insertion point
       const contextContent = pdfText || quill.getText(
         Math.max(0, currentRange.index - 500), 
-        Math.min(500, currentRange.index)
+        Math.min(500, currentRange.index) // Context before cursor
       );
       console.log('Context content length:', contextContent.length);
       
@@ -103,27 +88,63 @@ export const useEventHandlers = (
       console.log('Calling generateText with prompt length:', fullPrompt.length);
       
       // Generate text with AI
+      console.log('>>> Calling generateText function...');
       console.log('Starting AI text generation');
       const generatedText = await generateText(fullPrompt, contextContent);
+      console.log('>>> generateText function returned. Value:', JSON.stringify(generatedText));
       console.log('AI text generation completed, generated text length:', generatedText?.length || 0);
       
       if (generatedText) {
-        // Insert the generated text at cursor position
-        console.log('Inserting generated text at index:', currentRange.index);
-        quill.insertText(currentRange.index, generatedText, 'user');
+        console.log('Raw AI Generated Markdown:\n', JSON.stringify(generatedText)); // Log the raw string
+
+        const insertDelta = aiMarkdownToDelta(generatedText, quill);
+        console.log('Generated Delta Ops:\n', JSON.stringify(insertDelta.ops, null, 2)); // Log the Delta ops
         
-        // Update cursor position
-        quill.setSelection(currentRange.index + generatedText.length, 0);
+        const finalDelta = new Delta()
+          .retain(currentRange.index)
+          .delete(currentRange.length) 
+          .concat(insertDelta);    
+
+        console.log('Applying Delta to Quill:', JSON.stringify(finalDelta.ops));
+        
+        const markdownModule = quill.getModule('markdown');
+        const wasMarkdownEnabled = markdownModule?.options?.enabled;
+
+        try {
+          if (markdownModule && markdownModule.options) {
+            markdownModule.options.enabled = false;
+          }
+          quill.updateContents(finalDelta, 'user'); 
+        } finally {
+          if (markdownModule && markdownModule.options && wasMarkdownEnabled !== undefined) {
+            markdownModule.options.enabled = wasMarkdownEnabled;
+          }
+        }
+        
+        let insertedTextEquivalentLength = 0;
+        insertDelta.ops.forEach((op: QuillOp) => {
+          if (typeof op.insert === 'string') {
+            insertedTextEquivalentLength += op.insert.length;
+          } else if (typeof op.insert === 'object') {
+            // For embeds (like images or custom blots), they usually occupy 1 position in Quill's model.
+            insertedTextEquivalentLength += 1;
+          }
+        });
+        
+        // Update cursor position to be after the inserted content
+        quill.setSelection(currentRange.index + insertedTextEquivalentLength, 0);
         
         toast({
           title: 'Text generated',
           description: 'AI-generated text has been added to your document.',
         });
       } else {
+        console.log('>>> generatedText is FALSY. Value:', JSON.stringify(generatedText));
         console.error('Generated text was empty');
         throw new Error('No text was generated');
       }
     } catch (error: any) {
+      console.error('>>> ERROR in handleAIGenerate:', error);
       console.error('Error generating text:', error);
       toast({
         title: 'Error generating text',
@@ -600,6 +621,7 @@ export const useEventHandlers = (
     if (!quill || !Delta) return; // Ensure Quill and Delta are available
     
     const handleAIGenerateEvent = (e: any) => {
+      console.log('>>> "ai-generate" event RECEIVED. Details:', e.detail);
       const { range } = e.detail;
       
       // Store the current range for later use
@@ -780,6 +802,8 @@ export const useEventHandlers = (
           const formattingPrompt = `Please format the following text content using Markdown.
 ${MARKDOWN_FORMATTING_INSTRUCTIONS}
 
+Also, if you notice potential OCR errors from PDF extraction in the content below, such as misspelled words or incomplete sentences, please correct them to ensure readability and coherence.
+
 Original Heading: ${section.heading}
 Original Summary: ${section.summary}
 
@@ -821,6 +845,9 @@ ${section.content}`;
           }
         });
 
+        const trimmedFinalContent = finalCombinedContent.trim();
+        console.log('PDF Combined Insert: Raw finalCombinedContent (Markdown from AI):\n', JSON.stringify(trimmedFinalContent));
+
         if (successfulFormats === 0) {
            // If ALL formatting failed, insert the completely raw combined content
            console.error('All section formatting failed. Inserting raw combined content.');
@@ -832,9 +859,61 @@ ${section.content}`;
              variant: 'destructive',
            });
         } else {
-            // Insert the combined content (mix of formatted and raw)
-            quill.insertText(range.index, finalCombinedContent.trim(), 'user');
-            quill.setSelection(range.index + finalCombinedContent.trim().length, 0);
+            const deltaToInsert = aiMarkdownToDelta(trimmedFinalContent, quill);
+            console.log('PDF Combined Insert: Generated Delta Ops:\n', JSON.stringify(deltaToInsert.ops, null, 2));
+
+            const updateDelta = new Delta()
+              .retain(range.index)
+              .delete(range.length) // Assuming range is for potential replacement
+              .concat(deltaToInsert);
+
+            const mainMarkdownModule = quill.getModule('markdown'); // Standard module
+            const wasMainMarkdownEnabled = mainMarkdownModule?.options?.enabled;
+            
+            // Get the quilljs-markdown instance attached in use-editor-setup
+            const quillJsMarkdownInstance = (quill as any).markdownModule; 
+            let originalQuillJsMarkdownProcess: (() => void) | undefined = undefined;
+
+            if (quillJsMarkdownInstance && typeof quillJsMarkdownInstance.process === 'function') {
+              originalQuillJsMarkdownProcess = quillJsMarkdownInstance.process;
+            }
+
+            try {
+              // 1. Disable main markdown module
+              if (mainMarkdownModule && mainMarkdownModule.options) {
+                mainMarkdownModule.options.enabled = false;
+              }
+              // 2. Temporarily neutralize the quilljs-markdown instance's process method
+              if (quillJsMarkdownInstance && originalQuillJsMarkdownProcess) {
+                quillJsMarkdownInstance.process = () => {
+                  console.log('[DIAGNOSTIC] (quill as any).markdownModule.process() was called but neutered for PDF insert.');
+                };
+              }
+
+              quill.updateContents(updateDelta, 'user');
+
+            } finally {
+              // 1. Restore main markdown module
+              if (mainMarkdownModule && mainMarkdownModule.options && wasMainMarkdownEnabled !== undefined) {
+                mainMarkdownModule.options.enabled = wasMainMarkdownEnabled;
+              }
+              // 2. Restore the quilljs-markdown instance's process method
+              if (quillJsMarkdownInstance && originalQuillJsMarkdownProcess) {
+                quillJsMarkdownInstance.process = originalQuillJsMarkdownProcess;
+                console.log('[DIAGNOSTIC] (quill as any).markdownModule.process() restored.');
+              }
+            }
+
+            // Calculate new cursor position based on the inserted Delta's text length
+            let insertedTextEquivalentLength = 0;
+            deltaToInsert.ops.forEach((op: QuillOp) => {
+              if (typeof op.insert === 'string') {
+                insertedTextEquivalentLength += op.insert.length;
+              } else if (typeof op.insert === 'object') {
+                insertedTextEquivalentLength += 1;
+              }
+            });
+            quill.setSelection(range.index + insertedTextEquivalentLength, 0);
 
             toast({
                 title: 'Sections Inserted',
@@ -902,7 +981,8 @@ ${section.content}`;
     setCurrentRange,
     setShowAPIKeyDialog,
     setShowAIPrompt,
-    Delta // Add Delta to dependencies
+    Delta, // Add Delta to dependencies
+    aiMarkdownToDelta // Add the new helper to dependencies
   ]);
 
   return {

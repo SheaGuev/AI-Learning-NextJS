@@ -121,6 +121,11 @@ const EditorWrapper: React.FC<QuillEditorProps> = ({
     
     // Create a function to process markdown on the loaded content
     const processMarkdown = () => {
+      // --- TEMPORARY DIAGNOSTIC --- Return early to prevent execution
+      // console.log('[DIAGNOSTIC] processMarkdown called, but returning early.');
+      // return;
+      // --- END TEMPORARY DIAGNOSTIC ---
+      
       try {
         // Process markdown if module exists
         const markdownModule = quill.getModule('markdown');

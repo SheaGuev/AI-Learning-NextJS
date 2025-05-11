@@ -1,5 +1,7 @@
 // AI-powered content formatting utilities
 import { OverlayManager } from '../ui/OverlayManager';
+import { MARKDOWN_FORMATTING_INSTRUCTIONS } from '@/lib/utils/markdown-constants';
+import { aiMarkdownToDelta, QuillOp } from '@/components/quill-editor/lib/utils/delta-utils';
 
 export class ContentFormatter {
   /**
@@ -27,22 +29,7 @@ export class ContentFormatter {
           detail: {
             content,
             heading,
-            formattingInstructions: `
-Format your response using proper Markdown syntax following these guidelines:
-1. Use proper paragraph breaks with a blank line between paragraphs
-2. For bullet lists, use * with a space after it, and place each item on a new line
-3. For numbered lists, use 1. 2. 3. with a space after the period
-4. For nested lists, indent with 1 space (not tabs) before the * or number
-5. For code blocks, use triple backticks (\`\`\`) on separate lines before and after the code
-6. For inline code, surround with single backticks (\`)
-7. For headings, use # with a space after it (## for heading 2, ### for heading 3)
-8. For emphasis, use *italic* or **bold** without spaces between the asterisks and text
-9. For blockquotes, use > with a space after it at the start of each line
-10. For tables, follow this format:
-| Column 1 | Column 2 |
-| -------- | -------- |
-| cell 1   | cell 2   |
-`
+            formattingInstructions: MARKDOWN_FORMATTING_INSTRUCTIONS
           },
           bubbles: true
         });
@@ -160,109 +147,82 @@ Format your response using proper Markdown syntax following these guidelines:
         return;
       }
       
-      // Get markdown module and track its state
-      const markdownModule = quill.getModule('markdown');
-      const wasEnabled = markdownModule?.options?.enabled || false;
+      const mainMarkdownModule = quill.getModule('markdown');
+      const wasMainMarkdownEnabled = mainMarkdownModule?.options?.enabled || false;
+      const quillJsMarkdownInstance = (quill as any).markdownModule;
+      let originalQuillJsMarkdownProcess: (() => void) | undefined = undefined;
+      if (quillJsMarkdownInstance && typeof quillJsMarkdownInstance.process === 'function') {
+        originalQuillJsMarkdownProcess = quillJsMarkdownInstance.process;
+      }
       
       try {
-        // Temporarily disable markdown processing to prevent premature processing
-        if (markdownModule && markdownModule.options) {
-          markdownModule.options.enabled = false;
+        // Convert incoming text (expected to be AI-generated Markdown) to Delta
+        const deltaToInsert = aiMarkdownToDelta(text, quill);
+        console.log('[ContentFormatter.safeInsertText] Raw Markdown for Delta conversion:\n', JSON.stringify(text));
+        console.log('[ContentFormatter.safeInsertText] Generated Delta Ops:\n', JSON.stringify(deltaToInsert.ops, null, 2));
+
+        // Prepare the update Delta - this assumes insertion at an index, not replacing a range.
+        // If replacement is needed, a `delete` op would be required before `concat`.
+        const updateDelta = new (quill.constructor.import('delta'))()
+            .retain(index)
+            .concat(deltaToInsert);
+
+        // Disable markdown processing to prevent premature processing or interference
+        if (mainMarkdownModule && mainMarkdownModule.options) {
+          mainMarkdownModule.options.enabled = false;
+        }
+        if (quillJsMarkdownInstance && originalQuillJsMarkdownProcess) {
+          quillJsMarkdownInstance.process = () => {
+            console.log('[DIAGNOSTIC] ContentFormatter: (quill as any).markdownModule.process() neutered.');
+          };
         }
         
-        // Ensure proper line breaks for lists to improve markdown parsing
-        let processedText = text;
-        
-        // Insert with adequate delay to ensure DOM has settled
-        setTimeout(() => {
-          try {
-            // Check if the editor is still valid
-            if (!quill || !quill.root) {
-              console.error('Quill editor is no longer valid');
-              reject(new Error('Quill editor not available'));
-              return;
-            }
+        // Insert with adequate delay to ensure DOM has settled (original logic)
+        // We will perform updateContents directly, then handle the rest.
+        // setTimeout is problematic for Promise-based function like this.
+
+        quill.updateContents(updateDelta, 'user');
+
+        // Restore markdown processing states
+        if (mainMarkdownModule && mainMarkdownModule.options && wasMainMarkdownEnabled) {
+          mainMarkdownModule.options.enabled = true;
+        }
+        if (quillJsMarkdownInstance && originalQuillJsMarkdownProcess) {
+          quillJsMarkdownInstance.process = originalQuillJsMarkdownProcess;
+        }
             
-            // Ensure the index is valid
-            const length = quill.getLength();
-            if (index < 0 || index > length) {
-              console.warn(`Invalid insertion index: ${index}, adjusting to valid range`);
-              index = Math.max(0, Math.min(index, length));
-            }
+        // Focus the editor (original logic, might need adjustment after Delta insert)
+        quill.focus();
             
-            // Preserve and save the selection
-            const originalRange = quill.getSelection();
-            
-            // Insert the processed text
-            quill.insertText(index, processedText, 'user');
-            
-            // Focus the editor
-            quill.focus();
-            
-            // Set selection after the inserted text
-            const targetIndex = Math.min(index + processedText.length, quill.getLength());
-            quill.setSelection(targetIndex, 0);
-            
-            // Re-enable markdown processing (if it was disabled - which it isn't currently)
-            if (markdownModule && markdownModule.options && wasEnabled) {
-              markdownModule.options.enabled = true;
-            }
-            
-            // Markdown processing is handled by the editor-change listener setup in use-editor-setup
-            // No need to call ensureMarkdownProcessed here
-            
-           
-            // Resolve immediately after insertion
-            console.log('Text insertion completed. Markdown processing handled by listener.');
-            resolve();
-            
-          } catch (error) {
-            console.error('Error in text insertion:', error);
-            
-            // Try a fallback insertion method
-            try {
-              console.log('Attempting fallback insertion method');
-              
-              // Re-enable markdown (if it was disabled)
-              if (markdownModule && markdownModule.options && wasEnabled) {
-                markdownModule.options.enabled = true;
-              }
-              
-              // Get the current selection
-              const range = quill.getSelection();
-              if (range) {
-                // Insert at current selection
-                quill.insertText(range.index, processedText, 'user');
-                quill.setSelection(range.index + processedText.length, 0);
-              } else {
-                // Insert at beginning
-                quill.insertText(0, processedText, 'user');
-                quill.setSelection(processedText.length, 0);
-              }
-              
-              // Markdown processing is handled by the editor-change listener
-              // No need for explicit calls here
-              
-             
-              console.log('Fallback insertion completed. Markdown processing handled by listener.');
-              resolve(); // Resolve after successful fallback insertion
-              
-            } catch (fallbackError) {
-              console.error('Fallback insertion also failed:', fallbackError);
-              reject(fallbackError);
-            }
+        // Set selection after the inserted text
+        let insertedTextEquivalentLength = 0;
+        deltaToInsert.ops.forEach((op: QuillOp) => { // Use QuillOp type
+          if (typeof op.insert === 'string') {
+            insertedTextEquivalentLength += op.insert.length;
+          } else if (typeof op.insert === 'object') { 
+            insertedTextEquivalentLength += 1;
           }
-        }, 100); // Initial insertion delay
+        });
+        const targetIndex = Math.min(index + insertedTextEquivalentLength, quill.getLength());
+        quill.setSelection(targetIndex, 0);
+            
+        console.log('[ContentFormatter.safeInsertText] Delta insertion completed. Markdown processing handled by listener.');
+        resolve();
+            
       } catch (error) {
-        console.error('Error in safeInsertText setup:', error);
-        
-        // Re-enable markdown processing if it was enabled
-        if (markdownModule && markdownModule.options) {
-          markdownModule.options.enabled = wasEnabled;
+        console.error('[ContentFormatter.safeInsertText] Error in Delta insertion:', error);
+        // Restore markdown modules in case of error before resolve/reject
+        if (mainMarkdownModule && mainMarkdownModule.options && wasMainMarkdownEnabled) {
+          mainMarkdownModule.options.enabled = true;
         }
-        
+        if (quillJsMarkdownInstance && originalQuillJsMarkdownProcess) {
+          quillJsMarkdownInstance.process = originalQuillJsMarkdownProcess;
+        }
         reject(error);
-      }
+      } 
+      // Original setTimeout structure removed as updateContents is synchronous enough for Delta.
+      // The main concern of the original setTimeout was DOM settling for plain text insertion and
+      // subsequent markdown processing, which we are now handling more directly.
     });
   }
 } 

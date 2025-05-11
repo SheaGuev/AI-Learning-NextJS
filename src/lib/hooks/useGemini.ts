@@ -139,7 +139,7 @@ export const useGemini = ({ config = {} }: UseGeminiProps = {}): UseGeminiReturn
       let response;
       try {
         response = await retryWithBackoff(async () => {
-          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.-flash:generateContent', {
+          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
