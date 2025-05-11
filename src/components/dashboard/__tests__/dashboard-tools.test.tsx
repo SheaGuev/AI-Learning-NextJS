@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DashboardTools from '../dashboard-tools'; // Adjust path as necessary
 
@@ -14,7 +14,9 @@ jest.mock('@/components/dashboard-tools/pomodoro-timer/pomodoro-timer', () => ()
 
 describe('DashboardTools Component', () => {
   it('should render all tool cards', () => {
-    render(<DashboardTools />);
+    act(() => {
+      render(<DashboardTools />);
+    });
 
     expect(screen.getByText('Knowledge Base')).toBeInTheDocument();
     expect(screen.getByText('Learning Path Planner')).toBeInTheDocument();
@@ -25,7 +27,9 @@ describe('DashboardTools Component', () => {
   });
 
   it('should not render any tool component initially', () => {
-    render(<DashboardTools />);
+    act(() => {
+      render(<DashboardTools />);
+    });
 
     expect(screen.queryByTestId('knowledge-base-mock')).not.toBeInTheDocument();
     expect(screen.queryByTestId('learning-path-mock')).not.toBeInTheDocument();
@@ -36,13 +40,18 @@ describe('DashboardTools Component', () => {
 
   it('should render the Knowledge Base tool when its card is clicked', async () => {
     const user = userEvent.setup();
-    render(<DashboardTools />);
+    
+    act(() => {
+      render(<DashboardTools />);
+    });
 
     const knowledgeBaseCard = screen.getByText('Knowledge Base').closest('div[class*="cursor-pointer"]');
     expect(knowledgeBaseCard).toBeInTheDocument();
 
     if (knowledgeBaseCard) {
-        await user.click(knowledgeBaseCard);
+        await act(async () => {
+          await user.click(knowledgeBaseCard);
+        });
         expect(await screen.findByTestId('knowledge-base-mock')).toBeInTheDocument();
         // Check others are not rendered
         expect(screen.queryByTestId('learning-path-mock')).not.toBeInTheDocument();
@@ -53,13 +62,18 @@ describe('DashboardTools Component', () => {
 
    it('should render the AI Tutor tool when its card is clicked', async () => {
     const user = userEvent.setup();
-    render(<DashboardTools />);
+    
+    act(() => {
+      render(<DashboardTools />);
+    });
 
     const aiTutorCard = screen.getByText('AI Tutor').closest('div[class*="cursor-pointer"]');
     expect(aiTutorCard).toBeInTheDocument();
 
     if (aiTutorCard) {
-        await user.click(aiTutorCard);
+        await act(async () => {
+          await user.click(aiTutorCard);
+        });
         expect(await screen.findByTestId('ai-tutor-mock')).toBeInTheDocument();
          // Check others are not rendered
         expect(screen.queryByTestId('knowledge-base-mock')).not.toBeInTheDocument();
@@ -70,26 +84,35 @@ describe('DashboardTools Component', () => {
 
   it('should hide the active tool when its card is clicked again', async () => {
     const user = userEvent.setup();
-    render(<DashboardTools />);
+    
+    act(() => {
+      render(<DashboardTools />);
+    });
 
     const pomodoroCard = screen.getByText('Pomodoro Timer').closest('div[class*="cursor-pointer"]');
     expect(pomodoroCard).toBeInTheDocument();
 
     if(pomodoroCard){
          // First click: show the tool
-        await user.click(pomodoroCard);
+        await act(async () => {
+          await user.click(pomodoroCard);
+        });
         expect(await screen.findByTestId('pomodoro-timer-mock')).toBeInTheDocument();
 
         // Second click: hide the tool
-        await user.click(pomodoroCard);
+        await act(async () => {
+          await user.click(pomodoroCard);
+        });
         expect(screen.queryByTestId('pomodoro-timer-mock')).not.toBeInTheDocument();
     }
-
   });
 
    it('should switch the active tool when a different card is clicked', async () => {
     const user = userEvent.setup();
-    render(<DashboardTools />);
+    
+    act(() => {
+      render(<DashboardTools />);
+    });
 
     const learningPathCard = screen.getByText('Learning Path Planner').closest('div[class*="cursor-pointer"]');
     const aiTutorCard = screen.getByText('AI Tutor').closest('div[class*="cursor-pointer"]');
@@ -98,12 +121,16 @@ describe('DashboardTools Component', () => {
 
    if(learningPathCard && aiTutorCard) {
      // Click Learning Path first
-     await user.click(learningPathCard);
+     await act(async () => {
+       await user.click(learningPathCard);
+     });
      expect(await screen.findByTestId('learning-path-mock')).toBeInTheDocument();
      expect(screen.queryByTestId('ai-tutor-mock')).not.toBeInTheDocument();
  
      // Click AI Tutor next
-     await user.click(aiTutorCard);
+     await act(async () => {
+       await user.click(aiTutorCard);
+     });
      expect(await screen.findByTestId('ai-tutor-mock')).toBeInTheDocument();
      expect(screen.queryByTestId('learning-path-mock')).not.toBeInTheDocument();
    }

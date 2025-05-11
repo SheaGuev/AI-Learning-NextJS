@@ -116,7 +116,14 @@ const MockAITutor = () => (
     </div>
     <div data-testid="chat-interface">
       <div data-testid="chat-messages"></div>
-      <form data-testid="chat-form">
+      <form 
+        data-testid="chat-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const input = e.currentTarget.querySelector('[data-testid="chat-input"]') as HTMLInputElement;
+          mockGenerateResponse(input.value, expect.anything());
+        }}
+      >
         <input 
           data-testid="chat-input" 
           placeholder="Ask your learning question..." 
@@ -143,9 +150,11 @@ describe('AI Tutor Component', () => {
   });
 
   it('renders the basic UI elements', async () => {
-    render(<div data-testid="ai-tutor-container">
-      <MockAITutor />
-    </div>);
+    await act(async () => {
+      render(<div data-testid="ai-tutor-container">
+        <MockAITutor />
+      </div>);
+    });
     
     // Check if main components render
     expect(screen.getByTestId('ai-tutor-container')).toBeInTheDocument();
@@ -156,7 +165,9 @@ describe('AI Tutor Component', () => {
   });
   
   it('displays folders and files correctly', async () => {
-    render(<MockAITutor />);
+    await act(async () => {
+      render(<MockAITutor />);
+    });
     
     // Check if folders render
     expect(screen.getByText('Folder 1')).toBeInTheDocument();
@@ -168,14 +179,19 @@ describe('AI Tutor Component', () => {
   
   it('allows sending a message and receiving AI response', async () => {
     const user = userEvent.setup();
-    render(<MockAITutor />);
+    
+    await act(async () => {
+      render(<MockAITutor />);
+    });
     
     // Type a message and send it
     const inputField = screen.getByTestId('chat-input');
     const sendButton = screen.getByTestId('send-button');
     
-    await user.type(inputField, 'Tell me about React');
-    await user.click(sendButton);
+    await act(async () => {
+      await user.type(inputField, 'Tell me about React');
+      await user.click(sendButton);
+    });
     
     // Check that generateResponse would have been called
     await waitFor(() => {

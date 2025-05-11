@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -69,7 +69,9 @@ describe('DashboardSetup Component', () => {
   });
 
   it('should render the form correctly', () => {
-    render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    act(() => {
+      render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    });
 
     expect(screen.getByText('Create A Workspace')).toBeInTheDocument();
     expect(screen.getByLabelText(/Name/i)).toBeInTheDocument();
@@ -79,9 +81,13 @@ describe('DashboardSetup Component', () => {
 
   it('should allow changing the emoji', async () => {
     const user = userEvent.setup();
-    render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    
+    await act(async () => {
+      render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    });
 
     const emojiPickerTrigger = screen.getByTestId('emoji-picker');
+    
     await user.click(emojiPickerTrigger); // Simulate clicking the picker trigger
 
     // The mock EmojiPicker immediately calls getValue with '🚀' on click
@@ -90,10 +96,14 @@ describe('DashboardSetup Component', () => {
   });
 
   it('should display validation error for empty workspace name', async () => {
-     const user = userEvent.setup();
-    render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    const user = userEvent.setup();
+    
+    await act(async () => {
+      render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    });
 
     const submitButton = screen.getByRole('button', { name: /Create Workspace/i });
+    
     await user.click(submitButton);
 
     expect(await screen.findByText(/Workspace name is required/i)).toBeInTheDocument();
@@ -101,8 +111,11 @@ describe('DashboardSetup Component', () => {
   });
 
   it('should submit the form with valid data and navigate on success', async () => {
-     const user = userEvent.setup();
-    render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    const user = userEvent.setup();
+    
+    await act(async () => {
+      render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    });
 
     const workspaceNameInput = screen.getByLabelText(/Name/i);
     const submitButton = screen.getByRole('button', { name: /Create Workspace/i });
@@ -110,9 +123,10 @@ describe('DashboardSetup Component', () => {
 
     // Change emoji
     await user.click(emojiPickerTrigger);
+    
     expect(await screen.findByText('🚀')).toBeInTheDocument();
 
-    // Fill in workspace name
+    // Fill in workspace name and submit
     await user.type(workspaceNameInput, 'My Test Workspace');
     await user.click(submitButton);
 
@@ -132,7 +146,6 @@ describe('DashboardSetup Component', () => {
     });
     expect(createWorkspace).toHaveBeenCalledWith(expectedWorkspaceData);
 
-
     // Check dispatch call
      await waitFor(() => {
         expect(mockDispatch).toHaveBeenCalledWith({
@@ -147,7 +160,6 @@ describe('DashboardSetup Component', () => {
           });
      });
 
-
     // Check toast message
     await waitFor(() => {
         expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
@@ -156,30 +168,36 @@ describe('DashboardSetup Component', () => {
         }));
     });
 
-
     // Check navigation
     await waitFor(() => {
         expect(mockRouterPush).toHaveBeenCalledWith(expect.stringMatching(/\/dashboard\/[a-f0-9-]+/)); // Match UUID pattern
     });
-
   });
 
    it('should display error toast if workspace creation fails', async () => {
      const user = userEvent.setup();
+     
     // Mock createWorkspace to simulate an error
     (createWorkspace as jest.Mock).mockResolvedValueOnce({ data: null, error: new Error('Creation failed') });
 
-    render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    await act(async () => {
+      render(<DashboardSetup user={mockUser} subscription={mockSubscription} />);
+    });
 
-    const workspaceNameInput = screen.getByLabelText(/Name/i);
+    const workspaceNameInput = screen.getByLabelText(/Name/i) as HTMLInputElement; // Cast for .value
     const submitButton = screen.getByRole('button', { name: /Create Workspace/i });
 
     await user.type(workspaceNameInput, 'Failing Workspace');
     await user.click(submitButton);
 
-     await waitFor(() => {
+    // Attempt to flush microtasks before waitFor assertions
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
       expect(createWorkspace).toHaveBeenCalledTimes(1);
-     });
+    });
 
     await waitFor(() => {
         expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
@@ -188,6 +206,13 @@ describe('DashboardSetup Component', () => {
         }));
     });
 
+    await waitFor(() => {
+      expect(workspaceNameInput.value).toBe('');
+    });
+
+    await waitFor(() => {
+      expect(submitButton).not.toBeDisabled();
+    });
 
     expect(mockDispatch).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();

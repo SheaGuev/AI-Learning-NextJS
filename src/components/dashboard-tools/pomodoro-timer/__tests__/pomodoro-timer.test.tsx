@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import PomodoroTimer from '../pomodoro-timer';
 import { PomodoroProvider } from '@/lib/providers/pomodoro-provider'; // Adjust path if needed
 
@@ -7,12 +7,14 @@ import { PomodoroProvider } from '@/lib/providers/pomodoro-provider'; // Adjust 
 // or wrap the component for simple cases.
 describe('PomodoroTimer Component Integration', () => {
   it('should render the initial work session time', () => {
-    // Render the component within its provider
-    render(
-      <PomodoroProvider>
-        <PomodoroTimer />
-      </PomodoroProvider>
-    );
+    // Render the component within its provider using act
+    act(() => {
+      render(
+        <PomodoroProvider>
+          <PomodoroTimer />
+        </PomodoroProvider>
+      );
+    });
 
     // Check if the default work time (e.g., 25:00) is displayed
     // Note: Adjust the expected time based on your WORK_DURATION constant

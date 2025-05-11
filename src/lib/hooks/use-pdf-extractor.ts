@@ -32,8 +32,21 @@ const loadPDFJS = async () => {
     // Set the pdfjsLib on window for future use
     (window as any).pdfjsLib = pdfjs;
     
-    // Set the worker source to our local copy
-    pdfjs.GlobalWorkerOptions.workerSrc = '/pdf-lib/pdf.worker.js';
+    // Check if GlobalWorkerOptions exists before setting the worker source
+    if (!pdfjs.GlobalWorkerOptions) {
+      throw new Error('PDF.js GlobalWorkerOptions not available');
+    }
+
+    // Set the worker source path based on environment
+    let workerSrc = '/pdf-lib/pdf.worker.js';
+    
+    // If running in test environment, use mock worker or CDN path
+    if (process.env.NODE_ENV === 'test') {
+      // Use a mock path that our tests won't actually try to load
+      workerSrc = 'mock-worker-path-for-tests.js';
+    }
+    
+    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
     
     return pdfjs;
   } catch (error) {
@@ -133,23 +146,48 @@ export const usePDFExtractor = (options: PDFExtractorOptions = {}) => {
       const chunks: string[] = [];
       let startIndex = 0;
       
+      console.log('[Chunker Debug] Initial fullText length:', fullText.length, 'chunkSize:', chunkSize, 'overlapSize:', overlapSize);
+
       while (startIndex < fullText.length) {
+        console.log('\n[Chunker Debug] Iteration start. startIndex:', startIndex);
         let endIndex = startIndex + chunkSize;
+        console.log('[Chunker Debug] Initial endIndex:', endIndex);
+
         if (endIndex < fullText.length) {
           const searchStart = Math.max(startIndex, endIndex - overlapSize);
           const searchEnd = Math.min(endIndex + overlapSize, fullText.length);
           const searchText = fullText.substring(searchStart, searchEnd);
-          const lastSentenceEnd = Math.max(
-            searchText.lastIndexOf('.'),
-            searchText.lastIndexOf('?'),
-            searchText.lastIndexOf('!')
-          );
+          console.log('[Chunker Debug] Sentence search window (searchStart, searchEnd):', searchStart, searchEnd);
+          console.log('[Chunker Debug] searchText (length ' + searchText.length + '): "' + searchText.substring(0, 50) + '..."');
+          
+          const lastDot = searchText.lastIndexOf('.');
+          const lastQMark = searchText.lastIndexOf('?');
+          const lastExcl = searchText.lastIndexOf('!');
+          console.log('[Chunker Debug] lastDot:', lastDot, 'lastQMark:', lastQMark, 'lastExcl:', lastExcl);
+          
+          const lastSentenceEnd = Math.max(lastDot, lastQMark, lastExcl);
+          console.log('[Chunker Debug] lastSentenceEnd (relative to searchText):', lastSentenceEnd);
+
           if (lastSentenceEnd !== -1) {
             endIndex = searchStart + lastSentenceEnd + 1;
+            console.log('[Chunker Debug] Adjusted endIndex by sentence:', endIndex);
+          } else {
+            console.log('[Chunker Debug] No sentence end found in search window. endIndex remains initial.');
           }
+        } else {
+          console.log('[Chunker Debug] endIndex >= fullText.length, skipping sentence adjustment.');
         }
-        chunks.push(fullText.substring(startIndex, endIndex).trim());
+        
+        const currentChunk = fullText.substring(startIndex, endIndex).trim();
+        chunks.push(currentChunk);
+        console.log('[Chunker Debug] Pushed chunk (length ' + currentChunk.length + '): "' + currentChunk.substring(0, 50) + '..."');
+        console.log('[Chunker Debug] chunks.length so far:', chunks.length);
+
         startIndex = endIndex - overlapSize;
+        console.log('[Chunker Debug] Next startIndex:', startIndex);
+        if (startIndex >= fullText.length) {
+          console.log('[Chunker Debug] Next startIndex >= fullText.length. Loop will terminate.');
+        }
       }
       
       toast({

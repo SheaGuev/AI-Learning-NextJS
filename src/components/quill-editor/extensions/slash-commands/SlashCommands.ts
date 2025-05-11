@@ -11,6 +11,7 @@ export default class SlashCommands {
   container: HTMLElement | null = null;
   isOpen: boolean = false;
   dialog: Dialog | null = null;
+  private activeSelection: { index: number, length: number } | null = null;
   
   constructor(quill: any, options: any) {
     console.log('SlashCommands constructor initialized', { options });
@@ -317,6 +318,7 @@ export default class SlashCommands {
     }
     
     console.log('Opening slash commands menu');
+    this.activeSelection = selection; // Store the selection
     
     // If already open, don't reopen
     if (this.isOpen) {
@@ -446,8 +448,13 @@ export default class SlashCommands {
     });
 
     // Store the current selection before any DOM changes
-    let selection = this.quill.getSelection();
-    
+    let selection = this.activeSelection; // Prioritize stored selection
+
+    if (!selection) {
+        console.warn('activeSelection was null, attempting to get current selection from Quill.');
+        selection = this.quill.getSelection(); // Try current selection as a fallback
+    }
+
     if (isAiCommand) {
       console.log('AI COMMAND EXECUTION - Initial selection:', selection);
       console.log('AI COMMAND - Quill state:', {
@@ -806,6 +813,7 @@ export default class SlashCommands {
     if (this.container) {
       this.container.classList.add('hidden');
       this.isOpen = false;
+      this.activeSelection = null; // Clear the stored selection
     }
   }
   

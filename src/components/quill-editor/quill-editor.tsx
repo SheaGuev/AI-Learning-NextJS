@@ -24,7 +24,7 @@ import { QuillEditorProps } from './types';
  * Components:
  * - EditorWrapper: Main component that ties everything together
  * - AIGenerationProvider: Manages AI generation UI and state
- * - DocumentBanner: Displays document banner
+ * - DocumentBanner: Displays document banner * not integrated yet
  * - DocumentTitle: Displays and manages document title
  * - EditorHeader: Header with breadcrumbs and collaborators
  * - TrashBanner: Shows banner when document is in trash

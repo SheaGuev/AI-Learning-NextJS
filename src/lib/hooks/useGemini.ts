@@ -64,10 +64,10 @@ export const useGemini = ({ config = {} }: UseGeminiProps = {}): UseGeminiReturn
   // Try to load API key from localStorage on mount
   useEffect(() => {
     const savedApiKey = localStorage.getItem('gemini_api_key');
-    if (savedApiKey && !apiKey) {
+    if (savedApiKey) {
       setApiKey(savedApiKey);
     }
-  }, [apiKey]);
+  }, []);
 
   // Save API key to localStorage when it changes
   useEffect(() => {
@@ -139,7 +139,7 @@ export const useGemini = ({ config = {} }: UseGeminiProps = {}): UseGeminiReturn
       let response;
       try {
         response = await retryWithBackoff(async () => {
-          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.-flash:generateContent', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
