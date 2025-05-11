@@ -64,10 +64,10 @@ export const useGemini = ({ config = {} }: UseGeminiProps = {}): UseGeminiReturn
   // Try to load API key from localStorage on mount
   useEffect(() => {
     const savedApiKey = localStorage.getItem('gemini_api_key');
-    if (savedApiKey && !apiKey) {
+    if (savedApiKey) {
       setApiKey(savedApiKey);
     }
-  }, [apiKey]);
+  }, []);
 
   // Save API key to localStorage when it changes
   useEffect(() => {

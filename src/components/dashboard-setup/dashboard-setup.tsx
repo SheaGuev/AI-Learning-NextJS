@@ -97,7 +97,7 @@ const DashboardSetup: React.FC<DashboardSetupProps> = ({
       };
       const { data, error: createError } = await createWorkspace(newWorkspace);
       if (createError) {
-        throw new Error();
+        throw createError;
       }
       dispatch({
         type: 'ADD_WORKSPACE',

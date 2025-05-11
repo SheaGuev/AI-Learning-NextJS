@@ -6,7 +6,7 @@ import { useSocket } from '@/lib/providers/socket-provider';
 // Components
 import TrashBanner from './TrashBanner';
 import EditorHeader from './EditorHeader';
-import DocumentBanner from './DocumentBanner';
+// import DocumentBanner from './DocumentBanner';
 import DocumentTitle from './DocumentTitle';
 
 // Hooks and providers
@@ -121,6 +121,11 @@ const EditorWrapper: React.FC<QuillEditorProps> = ({
     
     // Create a function to process markdown on the loaded content
     const processMarkdown = () => {
+      // --- TEMPORARY DIAGNOSTIC --- Return early to prevent execution
+      // console.log('[DIAGNOSTIC] processMarkdown called, but returning early.');
+      // return;
+      // --- END TEMPORARY DIAGNOSTIC ---
+      
       try {
         // Process markdown if module exists
         const markdownModule = quill.getModule('markdown');
@@ -298,12 +303,12 @@ const EditorWrapper: React.FC<QuillEditorProps> = ({
         />
       </div>
       
-      {/* Document banner image */}
+      {/* Document banner image
       <DocumentBanner
         bannerUrl={details.bannerUrl}
         onDeleteBanner={deleteBanner}
         deletingBanner={deletingBanner}
-      />
+      /> */}
       
       {/* Document content area */}
       <div className="flex justify-start items-start flex-col mt-2 relative w-full px-2">

@@ -41,9 +41,19 @@ export const useContentLoader = (
             const parsedData = JSON.parse(selectedDir[0].data);
             const markdownContent = parsedData.content || '';
             console.log('Loading raw markdown content into Quill...');
-            // quill.setText(markdownContent); // Just set the raw text
-            // Let the quilljs-markdown listener handle processing
-            importMarkdown(markdownContent); // Explicitly call importMarkdown
+            
+            // Import the markdown content
+            importMarkdown(markdownContent); // Call importMarkdown
+            
+            // Ensure markdown processing runs after content is loaded
+            setTimeout(() => {
+              // Process markdown after a short delay to ensure the editor has settled
+              const markdownModule = quill.getModule('markdown');
+              if (markdownModule && typeof markdownModule.process === 'function') {
+                console.log('Explicitly processing markdown after content load');
+                markdownModule.process();
+              }
+            }, 300);
           } catch (e) {
             console.error('Error parsing markdown data object, falling back to setting raw text:', e);
             quill.setText(selectedDir[0].data); // Fallback to raw data string
@@ -91,6 +101,15 @@ export const useContentLoader = (
           // Use the shared processing function
           // processMarkdownContent(quill, parsedData.content);
           importMarkdown(parsedData.content); // Call importMarkdown here too
+          
+          // Ensure markdown is properly processed after loading
+          setTimeout(() => {
+            const markdownModule = quill.getModule('markdown');
+            if (markdownModule && typeof markdownModule.process === 'function') {
+              console.log('Processing markdown after folder content load');
+              markdownModule.process();
+            }
+          }, 300);
         } else {
           // Normal Quill delta content
           quill.setContents(parsedData);
@@ -122,6 +141,15 @@ export const useContentLoader = (
           // Use the shared processing function
           // processMarkdownContent(quill, parsedData.content);
           importMarkdown(parsedData.content); // And here for workspace loading
+          
+          // Ensure markdown is properly processed after loading
+          setTimeout(() => {
+            const markdownModule = quill.getModule('markdown');
+            if (markdownModule && typeof markdownModule.process === 'function') {
+              console.log('Processing markdown after workspace content load');
+              markdownModule.process();
+            }
+          }, 300);
         } else {
           // Normal Quill delta content
           quill.setContents(parsedData);

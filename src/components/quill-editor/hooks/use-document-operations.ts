@@ -281,7 +281,36 @@ export const useDocumentOperations = (quill: any, fileId: string, dirType: 'file
       const turndownService = new TurndownService({
         headingStyle: 'atx',
         codeBlockStyle: 'fenced',
-        bulletListMarker: '*'
+        bulletListMarker: '*',
+        listIndent: '    ' // Ensure 4 spaces are used for nested lists
+      });
+      
+      // Add custom rule for lists to ensure proper nesting with 4 spaces
+      turndownService.addRule('listItem', {
+        filter: 'li',
+        replacement: function (content: string, node: HTMLElement, options: any) {
+          content = content
+            .replace(/^\n+/, '') // remove leading newlines
+            .replace(/\n+$/, '\n') // replace trailing newlines with just a single one
+            .replace(/\n/gm, '\n    '); // indent
+          
+          const prefix = options.bulletListMarker + ' ';
+          const parent = node.parentNode as HTMLElement;
+          
+          if (parent.nodeName === 'OL') {
+            const start = parent.getAttribute('start');
+            const index = Array.prototype.indexOf.call(parent.children, node);
+            const number = start ? Number(start) + index : index + 1;
+            
+            return (
+              number + '. ' + content + (node.nextSibling && !/\n$/.test(content) ? '\n' : '')
+            );
+          } else {
+            return (
+              prefix + content + (node.nextSibling && !/\n$/.test(content) ? '\n' : '')
+            );
+          }
+        }
       });
       
       const markdown = turndownService.turndown(html);
@@ -360,6 +389,62 @@ export const useDocumentOperations = (quill: any, fileId: string, dirType: 'file
             if (line.startsWith('#### ')) {
               const content = line.substring(5);
               quill.insertText(currentIndex, content + '\n', { header: 4 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process indented bullet lists with spaces or tabs
+            // Level 1 indentation (4 spaces or 1 tab)
+            if (line.startsWith('    * ') || line.startsWith('    - ') || 
+                line.startsWith('\t* ') || line.startsWith('\t- ')) {
+              const content = line.startsWith('\t') ? line.substring(3) : line.substring(6);
+              quill.insertText(currentIndex, content + '\n', { list: 'bullet', indent: 1 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Level 2 indentation (8 spaces or 2 tabs)
+            if (line.startsWith('        * ') || line.startsWith('        - ') || 
+                line.startsWith('\t\t* ') || line.startsWith('\t\t- ')) {
+              const content = line.startsWith('\t') ? line.substring(4) : line.substring(10);
+              quill.insertText(currentIndex, content + '\n', { list: 'bullet', indent: 2 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Level 3 indentation (12 spaces or 3 tabs)
+            if (line.startsWith('            * ') || line.startsWith('            - ') || 
+                line.startsWith('\t\t\t* ') || line.startsWith('\t\t\t- ')) {
+              const content = line.startsWith('\t') ? line.substring(5) : line.substring(14);
+              quill.insertText(currentIndex, content + '\n', { list: 'bullet', indent: 3 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Process indented ordered lists with spaces or tabs
+            // Handle spaces indentation (4, 8, 12 spaces)
+            const indentedNumberedListMatch = line.match(/^(\s{4}|\t)(\d+\.\s)(.+)$/);
+            if (indentedNumberedListMatch) {
+              const content = indentedNumberedListMatch[3];
+              quill.insertText(currentIndex, content + '\n', { list: 'ordered', indent: 1 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Handle double indentation (8 spaces or 2 tabs)
+            const doubleIndentedNumberedListMatch = line.match(/^(\s{8}|\t\t)(\d+\.\s)(.+)$/);
+            if (doubleIndentedNumberedListMatch) {
+              const content = doubleIndentedNumberedListMatch[3];
+              quill.insertText(currentIndex, content + '\n', { list: 'ordered', indent: 2 });
+              currentIndex += content.length + 1;
+              continue;
+            }
+            
+            // Handle triple indentation (12 spaces or 3 tabs)
+            const tripleIndentedNumberedListMatch = line.match(/^(\s{12}|\t\t\t)(\d+\.\s)(.+)$/);
+            if (tripleIndentedNumberedListMatch) {
+              const content = tripleIndentedNumberedListMatch[3];
+              quill.insertText(currentIndex, content + '\n', { list: 'ordered', indent: 3 });
               currentIndex += content.length + 1;
               continue;
             }

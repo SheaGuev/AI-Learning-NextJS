@@ -6,12 +6,14 @@ This document provides an overview of the files within the `src/components/quill
 
 This file defines the `ContentFormatter` class, which contains static utility methods for interacting with AI services to format and generate content within the Quill editor, particularly in the context of PDF processing.
 
-*   **Imports:** Imports `OverlayManager` from `../ui/OverlayManager`.
+*   **Imports:** 
+    *   Imports `OverlayManager` from `../ui/OverlayManager`.
+    *   Imports `MARKDOWN_FORMATTING_INSTRUCTIONS` from `@/lib/utils/markdown-constants`.
 *   **`ContentFormatter` Class:**
     *   **`formatContentWithAI(quill, content, heading)` (async):**
         *   Takes a Quill instance, content string, and heading string.
         *   Temporarily disables the Quill 'markdown' module to prevent interference.
-        *   Dispatches a custom event `ai-format-pdf-content` with the content, heading, and detailed Markdown formatting instructions.
+        *   Dispatches a custom event `ai-format-pdf-content` with the content, heading, and the centralized MARKDOWN_FORMATTING_INSTRUCTIONS.
         *   Listens for a one-time `ai-formatted-pdf-content-response` event.
         *   Handles potential user cancellation via `OverlayManager.isOperationAborted()`.
         *   Re-enables the markdown module (if it was originally enabled).

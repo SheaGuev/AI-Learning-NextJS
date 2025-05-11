@@ -107,6 +107,7 @@ export const useEditorSetup = (wrapperRef: React.RefObject<HTMLDivElement | null
                       });
                       
                       quill.root.dispatchEvent(aiGenerateEvent);
+                      console.log('>>> "ai-generate" event DISPATCHED from slash command.');
                     }
                   },
                   {

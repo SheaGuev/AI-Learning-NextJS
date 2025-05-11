@@ -42,7 +42,7 @@ const DashboardTools: React.FC = () => {
     {
       id: 'knowledge-base',
       title: 'Knowledge Base',
-      description: 'Centralized study system with spaced repetition',
+      description: 'Centralised study system with spaced repetition',
       icon: <RiBrainLine />,
     },
     {

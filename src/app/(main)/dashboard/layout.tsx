@@ -31,14 +31,14 @@ const Layout: React.FC<LayoutProps> = ({ children, params }) => {
   }, [user, router]);
 
   // Show loading state while checking authentication
-  if (user === null) {
-    return (
-      <div className="flex items-center justify-center h-screen w-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2">Checking authentication...</p>
-      </div>
-    );
-  }
+  // if (user === null) {
+  //   return (
+  //     <div className="flex items-center justify-center h-screen w-screen">
+  //       <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  //       <p className="ml-2">Checking authentication...</p>
+  //     </div>
+  //   );
+  // }
 
   return (
     <main className="flex over-hidden h-screen">
