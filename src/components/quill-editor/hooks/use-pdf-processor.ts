@@ -115,6 +115,10 @@ export const usePDFProcessor = (quill: any, generateText: (prompt: string, conte
       const prompt = `Format the following text from a PDF section according to these instructions:
       ${formattingInstructions}
       
+      Also, if you notice potential OCR errors from PDF extraction in the content below, such as misspelled words or incomplete sentences, please correct them to ensure readability and coherence.
+      Keep core content as much as possible except for readability, if the extracted text is hard to understand such as diagram descriptions, feel free to rewrite it in a way that is easy to understand.
+
+
       Section heading: ${heading}
       
       Content to format:
